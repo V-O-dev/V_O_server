@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "GroupTheme", description = "그룹 테마 API")
 @RestController
-@RequestMapping("/group-themes")
+@RequestMapping("/api/v1/group-themes")
 @RequiredArgsConstructor
 public class GroupThemeController {
 
