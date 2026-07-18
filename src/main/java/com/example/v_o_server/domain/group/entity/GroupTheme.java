@@ -1,5 +1,6 @@
 package com.example.v_o_server.domain.group.entity;
 
+import com.example.v_o_server.common.entity.BaseCreatedAtEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -15,23 +16,23 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "group_themes")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class GroupTheme {
+public class GroupTheme extends BaseCreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Long id;
 
-    @Column(name = "code", nullable = false, unique = true)
+    @Column(name = "code", nullable = false, unique = true, length = 40)
     private String code;
 
-    @Column(name = "name", nullable = false)
+    @Column(name = "name", nullable = false, length = 80)
     private String name;
 
-    @Column(name = "description")
+    @Column(name = "description", length = 500)
     private String description;
 
-    @Column(name = "sort_order")
+    @Column(name = "sort_order", nullable = false)
     private Integer sortOrder;
 
     @Column(name = "is_active", nullable = false)
