@@ -27,6 +27,7 @@ public enum ErrorCode {
 
     // 사용자
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U001", "사용자를 찾을 수 없습니다."),
+    PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "U002", "프로필을 찾을 수 없습니다."),
 
     // 그룹
     GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "G001", "그룹을 찾을 수 없습니다."),
