@@ -23,7 +23,15 @@ public enum ErrorCode {
 
     // 인증/인가
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "A001", "인증이 필요합니다."),
-    ACCESS_DENIED(HttpStatus.FORBIDDEN, "A002", "접근 권한이 없습니다.");
+    ACCESS_DENIED(HttpStatus.FORBIDDEN, "A002", "접근 권한이 없습니다."),
+    OAUTH_INVALID_CODE(HttpStatus.UNAUTHORIZED, "A003", "OAuth 인가 코드 검증에 실패했습니다."),
+    OAUTH_UNSUPPORTED_PROVIDER(HttpStatus.BAD_REQUEST, "A004", "지원하지 않는 OAuth provider입니다."),
+    OAUTH_PROVIDER_ERROR(HttpStatus.BAD_GATEWAY, "A005", "OAuth provider 통신 중 오류가 발생했습니다."),
+    INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "A006", "유효하지 않은 refresh token입니다."),
+    REFRESH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "A007", "refresh token이 만료되었습니다."),
+    WITHDRAW_OWNER_EXISTS(HttpStatus.CONFLICT, "A008", "방장으로 있는 그룹이 남아있어 탈퇴할 수 없습니다."),
+    /** 로깅/추적 태그 용도. 정책상 클라이언트로 던지지 않고 탈퇴 자체는 롤백하지 않는다. */
+    OAUTH_UNLINK_FAILED(HttpStatus.BAD_GATEWAY, "A009", "OAuth provider unlink에 실패했습니다.");
 
     private final HttpStatus status;
     private final String code;

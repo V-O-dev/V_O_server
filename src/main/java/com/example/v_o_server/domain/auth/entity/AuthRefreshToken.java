@@ -58,4 +58,9 @@ public class AuthRefreshToken {
         this.issuedAt = issuedAt;
         this.expiresAt = expiresAt;
     }
+
+    public void revoke(LocalDateTime now, String reason) {
+        this.revokedAt = now;
+        this.revokeReason = reason;
+    }
 }
