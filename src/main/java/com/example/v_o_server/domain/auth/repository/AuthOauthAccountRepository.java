@@ -13,3 +13,4 @@ public interface AuthOauthAccountRepository extends JpaRepository<AuthOauthAccou
 
     List<AuthOauthAccount> findAllByUser(User user);
 }
+
