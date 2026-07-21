@@ -49,4 +49,13 @@ public class UserProfile extends BaseTimeEntity {
         this.profileImageUrl = profileImageUrl;
         this.profileImageObjectKey = profileImageObjectKey;
     }
+
+    public void updateNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    public void updateProfileImage(String profileImageUrl, String profileImageObjectKey) {
+        this.profileImageUrl = profileImageUrl;
+        this.profileImageObjectKey = profileImageObjectKey;
+    }
 }

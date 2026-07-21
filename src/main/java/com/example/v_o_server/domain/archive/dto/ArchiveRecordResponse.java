@@ -22,7 +22,11 @@ public record ArchiveRecordResponse(
         String groupTheme,
 
         @Schema(description = "영상 ID", example = "10")
-        Long videoId
+        Long videoId,
+
+        @Schema(description = "영상 썸네일 URL (없으면 null)",
+                example = "https://cdn.example.com/thumbnails/10.jpg", nullable = true)
+        String thumbnailUrl
 ) {
     public static ArchiveRecordResponse from(ArchiveEntry entry) {
         return new ArchiveRecordResponse(
@@ -31,6 +35,7 @@ public record ArchiveRecordResponse(
                 entry.getQuestionContentSnapshot(),
                 entry.getGroupNameSnapshot(),
                 entry.getGroupThemeSnapshot(),
-                entry.getVideo() == null ? null : entry.getVideo().getId());
+                entry.getVideo().getId(),
+                entry.getVideo().getThumbnailUrl());
     }
 }

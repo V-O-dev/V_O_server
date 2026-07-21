@@ -28,6 +28,14 @@ public enum ErrorCode {
     // 사용자
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U001", "사용자를 찾을 수 없습니다."),
     PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "U002", "프로필을 찾을 수 없습니다."),
+    NICKNAME_BLANK(HttpStatus.BAD_REQUEST, "U003", "공백을 제외한 한 글자 이상의 문자를 입력해주세요."),
+    NICKNAME_TOO_LONG(HttpStatus.BAD_REQUEST, "U004", "이름은 최대 15자까지 입력 가능합니다."),
+    NICKNAME_INVALID_CHAR(HttpStatus.BAD_REQUEST, "U005", "특수문자 및 이모지는 포함할 수 없습니다."),
+    UNSUPPORTED_IMAGE_TYPE(HttpStatus.BAD_REQUEST, "U006", "jpg, jpeg, png 파일만 업로드 가능합니다."),
+    IMAGE_SIZE_EXCEEDED(HttpStatus.PAYLOAD_TOO_LARGE, "U007", "파일 크기는 최대 5MB를 넘을 수 없습니다."),
+    IMAGE_REQUIRED(HttpStatus.BAD_REQUEST, "U008", "업로드할 이미지를 선택해주세요."),
+    IMAGE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "U009", "이미지 업로드에 실패했습니다. 다시 시도해주세요."),
+    IMAGE_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "U010", "이미지 삭제에 실패했습니다. 다시 시도해주세요."),
 
     // 그룹
     GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "G001", "그룹을 찾을 수 없습니다."),

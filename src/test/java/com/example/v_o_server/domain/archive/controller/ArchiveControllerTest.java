@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.v_o_server.domain.archive.dto.ArchiveCalendarResponse;
 import com.example.v_o_server.domain.archive.dto.ArchiveDailyResponse;
+import com.example.v_o_server.domain.archive.dto.ArchiveRecordResponse;
 import com.example.v_o_server.domain.archive.service.ArchiveService;
 import java.time.LocalDate;
 import java.util.List;
@@ -72,5 +73,28 @@ class ArchiveControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.records").isEmpty());
+    }
+
+    @Test
+    @DisplayName("일자별 기록은 카드 스냅샷과 영상 썸네일을 반환한다")
+    void returnsDailyRecordWithThumbnail() throws Exception {
+        LocalDate date = LocalDate.of(2026, 7, 17);
+        ArchiveRecordResponse record = new ArchiveRecordResponse(
+                1L, date, "오늘 가장 기뻤던 순간은?", "우리 가족", "FAMILY", 10L,
+                "https://cdn.example.com/thumbnails/10.jpg");
+        given(archiveService.getDailyRecords(TEMP_USER_ID, 100L, date))
+                .willReturn(new ArchiveDailyResponse(List.of(record)));
+
+        mockMvc.perform(get("/api/v1/archives/daily")
+                        .param("groupId", "100").param("date", "2026-07-17"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].archiveId").value(1))
+                .andExpect(jsonPath("$.data.records[0].questionContent")
+                        .value("오늘 가장 기뻤던 순간은?"))
+                .andExpect(jsonPath("$.data.records[0].groupName").value("우리 가족"))
+                .andExpect(jsonPath("$.data.records[0].groupTheme").value("FAMILY"))
+                .andExpect(jsonPath("$.data.records[0].videoId").value(10))
+                .andExpect(jsonPath("$.data.records[0].thumbnailUrl")
+                        .value("https://cdn.example.com/thumbnails/10.jpg"));
     }
 }
