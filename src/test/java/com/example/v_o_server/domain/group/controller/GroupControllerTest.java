@@ -14,6 +14,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.example.v_o_server.common.exception.BusinessException;
 import com.example.v_o_server.common.exception.ErrorCode;
 import com.example.v_o_server.common.security.CurrentUserProvider;
+import com.example.v_o_server.common.security.JwtAuthenticationFilter;
+import com.example.v_o_server.config.SecurityConfig;
 import com.example.v_o_server.domain.group.dto.GroupNameDuplicateResponse;
 import com.example.v_o_server.domain.group.service.GroupInviteService;
 import com.example.v_o_server.domain.group.service.GroupMemberService;
@@ -23,11 +25,16 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(controllers = GroupController.class)
+@WebMvcTest(controllers = GroupController.class,
+        excludeFilters = @ComponentScan.Filter(
+                type = FilterType.ASSIGNABLE_TYPE,
+                classes = {SecurityConfig.class, JwtAuthenticationFilter.class}))
 @AutoConfigureMockMvc(addFilters = false)
 @DisplayName("GroupController")
 class GroupControllerTest {

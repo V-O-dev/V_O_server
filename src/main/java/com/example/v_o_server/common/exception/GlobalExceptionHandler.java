@@ -6,6 +6,7 @@ import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -80,6 +81,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ErrorCode.INVALID_TYPE_VALUE.getStatus())
                 .body(ApiResponse.error(ErrorCode.INVALID_TYPE_VALUE,
                         "파라미터 '" + e.getName() + "'의 타입이 올바르지 않습니다."));
+    }
+
+    /**
+     * 요청 바디 파싱 실패 (JSON 형식 오류, enum에 없는 값 등).
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMessageNotReadable(HttpMessageNotReadableException e) {
+        log.warn("Malformed request body: {}", e.getMessage());
+        return ResponseEntity.status(ErrorCode.INVALID_INPUT_VALUE.getStatus())
+                .body(ApiResponse.error(ErrorCode.INVALID_INPUT_VALUE));
     }
 
     /**
