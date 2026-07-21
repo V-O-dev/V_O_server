@@ -2,6 +2,7 @@ package com.example.v_o_server.domain.group.repository;
 
 import com.example.v_o_server.domain.group.entity.GroupStatus;
 import com.example.v_o_server.domain.group.entity.PrivateGroup;
+import com.example.v_o_server.domain.user.entity.User;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -20,4 +21,6 @@ public interface PrivateGroupRepository extends JpaRepository<PrivateGroup, Long
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select g from PrivateGroup g where g.id = :id and g.status = :status")
     Optional<PrivateGroup> findByIdAndStatusForUpdate(@Param("id") Long id, @Param("status") GroupStatus status);
+
+    boolean existsByOwnerAndStatus(User owner, GroupStatus status);
 }
