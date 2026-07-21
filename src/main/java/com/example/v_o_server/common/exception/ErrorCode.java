@@ -31,7 +31,8 @@ public enum ErrorCode {
     REFRESH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "A007", "refresh token이 만료되었습니다."),
     WITHDRAW_OWNER_EXISTS(HttpStatus.CONFLICT, "A008", "방장으로 있는 그룹이 남아있어 탈퇴할 수 없습니다."),
     /** 로깅/추적 태그 용도. 정책상 클라이언트로 던지지 않고 탈퇴 자체는 롤백하지 않는다. */
-    OAUTH_UNLINK_FAILED(HttpStatus.BAD_GATEWAY, "A009", "OAuth provider unlink에 실패했습니다.");
+    OAUTH_UNLINK_FAILED(HttpStatus.BAD_GATEWAY, "A009", "OAuth provider unlink에 실패했습니다."),
+
     // 사용자
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U001", "사용자를 찾을 수 없습니다."),
     PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "U002", "프로필을 찾을 수 없습니다."),

@@ -36,7 +36,8 @@ public class UserService {
         User user = getUser(userId);
         UserProfile profile = getProfile(userId);
 
-        String provider = authOauthAccountRepository.findByUserId(userId)
+        String provider = authOauthAccountRepository.findAllByUser(user).stream()
+                .findFirst()
                 .map(AuthOauthAccount::getProvider)
                 .map(Enum::name)
                 .orElse(null);
