@@ -5,7 +5,10 @@ import com.example.v_o_server.common.exception.ErrorCode;
 import com.example.v_o_server.common.storage.FileStorageService;
 import com.example.v_o_server.common.storage.FileStorageService.StoredFile;
 import com.example.v_o_server.domain.auth.entity.AuthOauthAccount;
+import com.example.v_o_server.domain.auth.entity.OauthAccountStatus;
 import com.example.v_o_server.domain.auth.repository.AuthOauthAccountRepository;
+import com.example.v_o_server.domain.user.dto.request.UpdateNotificationSettingsRequest;
+import com.example.v_o_server.domain.user.dto.response.NotificationSettingsResponse;
 import com.example.v_o_server.domain.user.dto.response.ProfileImageResponse;
 import com.example.v_o_server.domain.user.dto.response.UserMeResponse;
 import com.example.v_o_server.domain.user.entity.User;
@@ -36,7 +39,7 @@ public class UserService {
         User user = getUser(userId);
         UserProfile profile = getProfile(userId);
 
-        String provider = authOauthAccountRepository.findByUserId(userId)
+        String provider = authOauthAccountRepository.findFirstByUserAndStatus(user, OauthAccountStatus.ACTIVE)
                 .map(AuthOauthAccount::getProvider)
                 .map(Enum::name)
                 .orElse(null);
@@ -56,6 +59,17 @@ public class UserService {
         UserProfile profile = getProfile(userId);
         profile.updateNickname(nickname);
         return profile.getNickname();
+    }
+
+    @Transactional
+    public NotificationSettingsResponse updateNotificationSettings(Long userId, UpdateNotificationSettingsRequest request) {
+        User user = getUser(userId);
+        user.updateNotificationSettings(request.questionNotification(), request.interactionNotification());
+
+        return new NotificationSettingsResponse(
+                user.getDailyQuestionNotificationEnabled(),
+                user.getInteractionNotificationEnabled()
+        );
     }
 
     @Transactional

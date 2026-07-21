@@ -1,6 +1,7 @@
 package com.example.v_o_server.domain.auth.repository;
 
 import com.example.v_o_server.domain.auth.entity.AuthOauthAccount;
+import com.example.v_o_server.domain.auth.entity.OauthAccountStatus;
 import com.example.v_o_server.domain.auth.entity.OauthProvider;
 import com.example.v_o_server.domain.user.entity.User;
 import java.util.List;
@@ -12,5 +13,7 @@ public interface AuthOauthAccountRepository extends JpaRepository<AuthOauthAccou
     Optional<AuthOauthAccount> findByProviderAndProviderUserId(OauthProvider provider, String providerUserId);
 
     List<AuthOauthAccount> findAllByUser(User user);
+
+    Optional<AuthOauthAccount> findFirstByUserAndStatus(User user, OauthAccountStatus status);
 }
 
