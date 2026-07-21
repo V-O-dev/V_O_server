@@ -15,7 +15,7 @@ import static org.mockito.Mockito.verify;
 
 import com.example.v_o_server.common.exception.BusinessException;
 import com.example.v_o_server.common.exception.ErrorCode;
-import com.example.v_o_server.common.storage.GroupImageStorage;
+import com.example.v_o_server.common.storage.FileStorageService;
 import com.example.v_o_server.domain.group.dto.GroupCreateRequest;
 import com.example.v_o_server.domain.group.dto.GroupCreateResponse;
 import com.example.v_o_server.domain.group.dto.GroupUpdateRequest;
@@ -58,7 +58,7 @@ class GroupServiceTest {
     @Mock
     private GroupAccessGuard accessGuard;
     @Mock
-    private GroupImageStorage groupImageStorage;
+    private FileStorageService fileStorageService;
 
     @InjectMocks
     private GroupService groupService;
@@ -172,8 +172,8 @@ class GroupServiceTest {
                     new MockMultipartFile("image", "a.png", "image/png", new byte[]{1, 2, 3});
 
             given(accessGuard.getActiveGroup(GROUP_ID)).willReturn(group);
-            given(groupImageStorage.store(image))
-                    .willReturn(new GroupImageStorage.StoredImage("https://cdn/a.png", "key/a.png"));
+            given(fileStorageService.upload(eq(image), any()))
+                    .willReturn(new FileStorageService.StoredFile("https://cdn/a.png", "key/a.png"));
             given(groupMemberRepository.findByGroupIdAndStatus(GROUP_ID, MemberStatus.ACTIVE))
                     .willReturn(List.of(member(1L, group, owner, GroupMemberRole.OWNER, MemberStatus.ACTIVE)));
 

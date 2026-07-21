@@ -2,7 +2,8 @@ package com.example.v_o_server.domain.group.service;
 
 import com.example.v_o_server.common.exception.BusinessException;
 import com.example.v_o_server.common.exception.ErrorCode;
-import com.example.v_o_server.common.storage.GroupImageStorage;
+import com.example.v_o_server.common.storage.FileStorageService;
+import com.example.v_o_server.common.storage.FileStorageService.StoredFile;
 import com.example.v_o_server.domain.group.dto.GroupCreateRequest;
 import com.example.v_o_server.domain.group.dto.GroupCreateResponse;
 import com.example.v_o_server.domain.group.dto.GroupDetailResponse;
@@ -36,13 +37,15 @@ public class GroupService {
     /** ERD 기본값. */
     private static final String DEFAULT_TIMEZONE = "Asia/Seoul";
     private static final int DEFAULT_MAX_MEMBERS = 15;
+    /** 그룹 이미지 저장 디렉터리 (FileStorageService). */
+    private static final String GROUP_IMAGE_DIR = "group-images";
 
     private final PrivateGroupRepository privateGroupRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final GroupThemeRepository groupThemeRepository;
     private final UserRepository userRepository;
     private final GroupAccessGuard accessGuard;
-    private final GroupImageStorage groupImageStorage;
+    private final FileStorageService fileStorageService;
 
     /** G1 그룹 생성 — 생성자는 OWNER 멤버로 함께 등록된다. */
     @Transactional
@@ -135,7 +138,7 @@ public class GroupService {
             group.updateName(request.groupName());
         }
         if (hasImage) {
-            GroupImageStorage.StoredImage stored = groupImageStorage.store(image);
+            StoredFile stored = fileStorageService.upload(image, GROUP_IMAGE_DIR);
             group.updateImage(stored.url(), stored.objectKey());
         }
 
