@@ -11,6 +11,7 @@ import jakarta.validation.constraints.Min;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,24 +31,22 @@ public class ArchiveController {
             description = "해당 그룹에서 내가 기록을 남긴 날짜 목록을 조회합니다. 본인 기록만 반환됩니다.")
     @GetMapping("/calendar")
     public ApiResponse<ArchiveCalendarResponse> getCalendar(
+            @AuthenticationPrincipal Long userId,
             @RequestParam Long groupId,
             @RequestParam @Min(value = 2000, message = "연도는 2000 이상이어야 합니다.")
             @Max(value = 2100, message = "연도는 2100 이하여야 합니다.") int year,
             @RequestParam @Min(value = 1, message = "월은 1 이상이어야 합니다.")
             @Max(value = 12, message = "월은 12 이하여야 합니다.") int month) {
-        // TODO: 인증 완성되면 @AuthenticationPrincipal 등으로 실제 userId 추출하도록 교체
-        Long tempUserId = 1L;
-        return ApiResponse.success(archiveService.getCalendar(tempUserId, groupId, year, month));
+        return ApiResponse.success(archiveService.getCalendar(userId, groupId, year, month));
     }
 
     @Operation(summary = "일자별 기록 조회",
             description = "해당 그룹·날짜의 내 기록 카드를 조회합니다. 기록이 없으면 빈 목록을 반환합니다.")
     @GetMapping("/daily")
     public ApiResponse<ArchiveDailyResponse> getDaily(
+            @AuthenticationPrincipal Long userId,
             @RequestParam Long groupId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        // TODO: 인증 완성되면 @AuthenticationPrincipal 등으로 실제 userId 추출하도록 교체
-        Long tempUserId = 1L;
-        return ApiResponse.success(archiveService.getDailyRecords(tempUserId, groupId, date));
+        return ApiResponse.success(archiveService.getDailyRecords(userId, groupId, date));
     }
 }
