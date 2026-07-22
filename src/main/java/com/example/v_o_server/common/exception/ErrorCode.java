@@ -33,7 +33,6 @@ public enum ErrorCode {
     /** 로깅/추적 태그 용도. 정책상 클라이언트로 던지지 않고 탈퇴 자체는 롤백하지 않는다. */
     OAUTH_UNLINK_FAILED(HttpStatus.BAD_GATEWAY, "A009", "OAuth provider unlink에 실패했습니다."),
     // 사용자
-    // 사용자
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U001", "사용자를 찾을 수 없습니다."),
     PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "U002", "프로필을 찾을 수 없습니다."),
     NICKNAME_BLANK(HttpStatus.BAD_REQUEST, "U003", "공백을 제외한 한 글자 이상의 문자를 입력해주세요."),
@@ -43,8 +42,9 @@ public enum ErrorCode {
     IMAGE_SIZE_EXCEEDED(HttpStatus.PAYLOAD_TOO_LARGE, "U007", "파일 크기는 최대 5MB를 넘을 수 없습니다."),
     IMAGE_REQUIRED(HttpStatus.BAD_REQUEST, "U008", "업로드할 이미지를 선택해주세요."),
     IMAGE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "U009", "이미지 업로드에 실패했습니다. 다시 시도해주세요."),
-    IMAGE_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "U010", "이미지 삭제에 실패했습니다. 다시 시도해주세요.");
-
+    IMAGE_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "U010", "이미지 삭제에 실패했습니다. 다시 시도해주세요."),
+    DEVICE_TOKEN_REQUIRED(HttpStatus.BAD_REQUEST, "U011", "디바이스 토큰이 필요합니다."),
+    INVALID_PLATFORM(HttpStatus.BAD_REQUEST, "U012", "유효하지 않은 플랫폼 값입니다.");
     private final HttpStatus status;
     private final String code;
     private final String message;
