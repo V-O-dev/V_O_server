@@ -1,16 +1,14 @@
 package com.example.v_o_server.domain.question.entity;
 
+import com.example.v_o_server.common.entity.BaseCreatedAtEntity;
 import com.example.v_o_server.domain.group.entity.GroupTheme;
-import jakarta.persistence.Column;
+import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.MapsId;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -18,21 +16,20 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "question_theme_maps",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"question_id", "theme_id"}))
+@Table(name = "question_theme_maps")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class QuestionThemeMap {
+public class QuestionThemeMap extends BaseCreatedAtEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
-    private Long id;
+    @EmbeddedId
+    private QuestionThemeMapId id;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("questionId")
     @JoinColumn(name = "question_id", nullable = false)
     private Question question;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("themeId")
     @JoinColumn(name = "theme_id", nullable = false)
     private GroupTheme theme;
 
@@ -40,5 +37,6 @@ public class QuestionThemeMap {
     private QuestionThemeMap(Question question, GroupTheme theme) {
         this.question = question;
         this.theme = theme;
+        this.id = new QuestionThemeMapId(question.getId(), theme.getId());
     }
 }

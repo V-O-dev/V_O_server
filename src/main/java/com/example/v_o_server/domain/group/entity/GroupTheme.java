@@ -1,5 +1,6 @@
 package com.example.v_o_server.domain.group.entity;
 
+import com.example.v_o_server.common.entity.BaseCreatedAtEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -15,7 +16,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "group_themes")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class GroupTheme {
+public class GroupTheme extends BaseCreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
