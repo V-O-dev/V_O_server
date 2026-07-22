@@ -2,7 +2,7 @@ package com.example.v_o_server.common.security;
 
 import com.example.v_o_server.common.exception.ErrorCode;
 import com.example.v_o_server.common.response.ApiResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
