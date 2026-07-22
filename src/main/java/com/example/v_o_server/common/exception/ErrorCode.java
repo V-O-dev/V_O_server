@@ -44,6 +44,8 @@ public enum ErrorCode {
     IMAGE_REQUIRED(HttpStatus.BAD_REQUEST, "U008", "업로드할 이미지를 선택해주세요."),
     IMAGE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "U009", "이미지 업로드에 실패했습니다. 다시 시도해주세요."),
     IMAGE_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "U010", "이미지 삭제에 실패했습니다. 다시 시도해주세요."),
+    DEVICE_TOKEN_REQUIRED(HttpStatus.BAD_REQUEST, "U011", "디바이스 토큰이 필요합니다."),
+    INVALID_PLATFORM(HttpStatus.BAD_REQUEST, "U012", "유효하지 않은 플랫폼 값입니다."),
 
     // 그룹
     GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "G001", "그룹을 찾을 수 없습니다."),
