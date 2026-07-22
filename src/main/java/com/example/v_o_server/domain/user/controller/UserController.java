@@ -2,6 +2,8 @@ package com.example.v_o_server.domain.user.controller;
 
 import com.example.v_o_server.common.response.ApiResponse;
 import com.example.v_o_server.domain.user.dto.request.UpdateNicknameRequest;
+import com.example.v_o_server.domain.user.dto.request.UpdateNotificationSettingsRequest;
+import com.example.v_o_server.domain.user.dto.response.NotificationSettingsResponse;
 import com.example.v_o_server.domain.user.dto.response.ProfileImageResponse;
 import com.example.v_o_server.domain.user.dto.response.UserMeResponse;
 import com.example.v_o_server.domain.user.service.UserService;
@@ -31,6 +33,15 @@ public class UserController {
     @GetMapping("/me")
     public ApiResponse<UserMeResponse> getMe(@AuthenticationPrincipal Long userId) {
         UserMeResponse response = userService.getMe(userId);
+        return ApiResponse.success(response);
+    }
+
+    @Operation(summary = "알림 설정 변경", description = "오늘의 질문 알림, 댓글·좋아요 알림 수신 여부를 변경합니다.")
+    @PatchMapping("/me/notification-settings")
+    public ApiResponse<NotificationSettingsResponse> updateNotificationSettings(
+            @Valid @RequestBody UpdateNotificationSettingsRequest request) {
+        Long tempUserId = 1L;
+        NotificationSettingsResponse response = userService.updateNotificationSettings(tempUserId, request);
         return ApiResponse.success(response);
     }
 

@@ -58,4 +58,9 @@ public class User extends BaseTimeEntity {
         this.status = UserStatus.WITHDRAWN;
         this.withdrawnAt = now;
     }
+
+    public void updateNotificationSettings(Boolean dailyQuestionNotificationEnabled, Boolean interactionNotificationEnabled) {
+        this.dailyQuestionNotificationEnabled = dailyQuestionNotificationEnabled;
+        this.interactionNotificationEnabled = interactionNotificationEnabled;
+    }
 }
