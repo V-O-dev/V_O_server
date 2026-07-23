@@ -64,7 +64,13 @@ public enum ErrorCode {
     GROUP_THEME_NOT_SET(HttpStatus.BAD_REQUEST, "G014", "그룹에 테마가 설정되어 있지 않습니다."),
 
     // 질문
-    NO_QUESTION_CANDIDATE(HttpStatus.NOT_FOUND, "Q001", "테마에 해당하는 추천 가능한 질문이 없습니다.");
+    NO_QUESTION_CANDIDATE(HttpStatus.NOT_FOUND, "Q001", "테마에 해당하는 추천 가능한 질문이 없습니다."),
+
+    // 영상
+    VIDEO_NOT_FOUND(HttpStatus.NOT_FOUND, "V001", "영상을 찾을 수 없습니다."),
+    DAILY_QUESTION_NOT_ASSIGNED(HttpStatus.BAD_REQUEST, "V002", "오늘 배정된 질문이 없습니다."),
+    QUESTION_MISMATCH(HttpStatus.BAD_REQUEST, "V003", "요청한 질문이 오늘 배정된 질문과 일치하지 않습니다."),
+    ALREADY_UPLOADED_TODAY(HttpStatus.CONFLICT, "V004", "오늘 이미 답변 영상을 업로드했습니다.");
 
     private final HttpStatus status;
     private final String code;
