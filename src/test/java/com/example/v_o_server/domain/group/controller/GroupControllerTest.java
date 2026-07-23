@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -20,6 +21,7 @@ import com.example.v_o_server.domain.group.dto.GroupNameDuplicateResponse;
 import com.example.v_o_server.domain.group.service.GroupInviteService;
 import com.example.v_o_server.domain.group.service.GroupMemberService;
 import com.example.v_o_server.domain.group.service.GroupService;
+import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,8 +30,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.multipart.MultipartFile;
 
 @WebMvcTest(controllers = GroupController.class,
         excludeFilters = @ComponentScan.Filter(
@@ -126,6 +130,59 @@ class GroupControllerTest {
 
         verify(groupMemberService).leaveGroup(USER_ID, 100L);
         verify(groupMemberService).kickMember(USER_ID, 100L, 11L);
+    }
+
+    @Test
+    @DisplayName("DELETE /groups/{id} 는 그룹 삭제로 라우팅된다")
+    void deleteGroupRoute() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(USER_ID);
+
+        mockMvc.perform(delete("/groups/100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(groupService).deleteGroup(USER_ID, 100L);
+    }
+
+    @Test
+    @DisplayName("방장이 아닌 사용자의 그룹 삭제는 G004 NOT_GROUP_OWNER")
+    void deleteGroupRequiresOwner() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(USER_ID);
+        willThrow(new BusinessException(ErrorCode.NOT_GROUP_OWNER))
+                .given(groupService).deleteGroup(USER_ID, 100L);
+
+        mockMvc.perform(delete("/groups/100"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("G004"));
+    }
+
+    @Test
+    @DisplayName("multipart 생성 요청은 이미지와 함께 서비스로 전달된다")
+    void createGroupWithImage() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(USER_ID);
+
+        MockMultipartFile request = new MockMultipartFile("request", null,
+                MediaType.APPLICATION_JSON_VALUE, createRequestJson("우리 가족").getBytes(StandardCharsets.UTF_8));
+        MockMultipartFile image =
+                new MockMultipartFile("image", "a.png", MediaType.IMAGE_PNG_VALUE, new byte[]{1, 2, 3});
+
+        mockMvc.perform(multipart("/groups").file(request).file(image))
+                .andExpect(status().isOk());
+
+        verify(groupService).createGroup(eq(USER_ID), any(), any(MultipartFile.class));
+    }
+
+    @Test
+    @DisplayName("JSON 생성 요청은 이미지 없이 기존 경로로 동작한다")
+    void createGroupWithoutImage() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(USER_ID);
+
+        mockMvc.perform(post("/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createRequestJson("우리 가족")))
+                .andExpect(status().isOk());
+
+        verify(groupService).createGroup(eq(USER_ID), any());
     }
 
     @Test

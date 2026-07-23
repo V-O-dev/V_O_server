@@ -16,6 +16,7 @@ import com.example.v_o_server.domain.group.entity.GroupStatus;
 import com.example.v_o_server.domain.group.entity.GroupTheme;
 import com.example.v_o_server.domain.group.entity.MemberStatus;
 import com.example.v_o_server.domain.group.entity.PrivateGroup;
+import com.example.v_o_server.domain.group.repository.GroupInviteRepository;
 import com.example.v_o_server.domain.group.repository.GroupMemberRepository;
 import com.example.v_o_server.domain.group.repository.GroupThemeRepository;
 import com.example.v_o_server.domain.group.repository.PrivateGroupRepository;
@@ -39,14 +40,25 @@ public class GroupService {
 
     private final PrivateGroupRepository privateGroupRepository;
     private final GroupMemberRepository groupMemberRepository;
+    private final GroupInviteRepository groupInviteRepository;
     private final GroupThemeRepository groupThemeRepository;
     private final UserRepository userRepository;
     private final GroupAccessGuard accessGuard;
     private final GroupImageStorage groupImageStorage;
 
-    /** G1 그룹 생성 — 생성자는 OWNER 멤버로 함께 등록된다. */
+    /** G1 그룹 생성 (이미지 없음) — JSON 요청 경로. */
     @Transactional
     public GroupCreateResponse createGroup(Long userId, GroupCreateRequest request) {
+        return createGroup(userId, request, null);
+    }
+
+    /**
+     * G1 그룹 생성 — 생성자는 OWNER 멤버로 함께 등록된다.
+     *
+     * <p>대표 이미지는 선택이다. 없으면 생성 후 그룹 수정 API로 언제든 등록할 수 있다.</p>
+     */
+    @Transactional
+    public GroupCreateResponse createGroup(Long userId, GroupCreateRequest request, MultipartFile image) {
         validateTimeRange(request.notificationStartTime(), request.notificationEndTime());
 
         if (groupMemberRepository.existsActiveGroupNameForUser(userId, request.groupName(), null)) {
@@ -57,10 +69,17 @@ public class GroupService {
         GroupTheme theme = groupThemeRepository.findByCode(request.themeCode())
                 .orElseThrow(() -> new BusinessException(ErrorCode.THEME_NOT_FOUND));
 
+        // 검증을 모두 통과한 뒤에 저장한다 — 실패한 요청의 이미지가 스토리지에 남지 않도록.
+        GroupImageStorage.StoredImage stored = (image != null && !image.isEmpty())
+                ? groupImageStorage.store(image)
+                : new GroupImageStorage.StoredImage(null, null);
+
         PrivateGroup group = privateGroupRepository.save(PrivateGroup.builder()
                 .owner(owner)
                 .theme(theme)
                 .name(request.groupName())
+                .groupImageUrl(stored.url())
+                .groupImageObjectKey(stored.objectKey())
                 .notificationStartTime(request.notificationStartTime())
                 .notificationEndTime(request.notificationEndTime())
                 .timezone(DEFAULT_TIMEZONE)
@@ -144,6 +163,28 @@ public class GroupService {
                         .map(GroupMemberResponse::from)
                         .toList();
         return GroupDetailResponse.of(group, members);
+    }
+
+    /**
+     * G12 그룹 삭제 — 방장만 가능.
+     *
+     * <p>그룹을 소프트 삭제하고, 남아 있던 멤버 전원을 함께 내보내며, 살아 있는 초대 코드를 모두 무효화한다.
+     * 세 작업은 한 트랜잭션이라 "그룹은 지워졌는데 멤버는 남아 있는" 중간 상태가 생기지 않는다.</p>
+     *
+     * <p>가입 처리와 동일한 비관적 쓰기 락으로 그룹을 잡아, 삭제 도중 새 멤버가 들어오는 경쟁을 막는다.</p>
+     */
+    @Transactional
+    public void deleteGroup(Long userId, Long groupId) {
+        PrivateGroup group = privateGroupRepository.findByIdAndStatusForUpdate(groupId, GroupStatus.ACTIVE)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+        accessGuard.assertOwner(groupId, userId);
+
+        LocalDateTime now = LocalDateTime.now();
+        // 벌크 연산은 영속성 컨텍스트를 flush 후 clear 하므로, 그룹 상태 변경을 먼저 적용해 함께 flush 되게 한다.
+        group.softDelete(now);
+        // 강제 퇴장이 아니므로 LEFT — 재가입 차단(블랙리스트) 대상이 되면 안 된다.
+        groupMemberRepository.leaveAllActiveMembers(groupId, now);
+        groupInviteRepository.revokeAllActiveInvites(groupId);
     }
 
     private User getUser(Long userId) {
