@@ -1,5 +1,6 @@
 package com.example.v_o_server.domain.group.entity;
 
+import com.example.v_o_server.common.entity.BaseTimeEntity;
 import com.example.v_o_server.domain.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -22,7 +23,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "group_members")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class GroupMember {
+public class GroupMember extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -38,14 +39,14 @@ public class GroupMember {
     private User user;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false)
+    @Column(name = "role", nullable = false, length = 20)
     private GroupMemberRole role;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status", nullable = false, length = 30)
     private MemberStatus status;
 
-    @Column(name = "joined_at")
+    @Column(name = "joined_at", nullable = false)
     private LocalDateTime joinedAt;
 
     @Column(name = "left_at")
@@ -62,5 +63,39 @@ public class GroupMember {
         this.role = role;
         this.status = status;
         this.joinedAt = joinedAt;
+    }
+
+    public boolean isActive() {
+        return status == MemberStatus.ACTIVE;
+    }
+
+    public boolean isOwner() {
+        return role == GroupMemberRole.OWNER;
+    }
+
+    public void changeRole(GroupMemberRole role) {
+        this.role = role;
+    }
+
+    /** 본인이 그룹을 나감. */
+    public void leave(LocalDateTime leftAt) {
+        this.status = MemberStatus.LEFT;
+        this.leftAt = leftAt;
+    }
+
+    /** 방장에 의한 강제 퇴장. */
+    public void kick(Long kickedByUserId, LocalDateTime leftAt) {
+        this.status = MemberStatus.KICKED;
+        this.kickedBy = kickedByUserId;
+        this.leftAt = leftAt;
+    }
+
+    /** LEFT/KICKED 멤버의 재가입 — 이력 행을 재사용한다. */
+    public void rejoin(LocalDateTime joinedAt) {
+        this.status = MemberStatus.ACTIVE;
+        this.role = GroupMemberRole.MEMBER;
+        this.joinedAt = joinedAt;
+        this.leftAt = null;
+        this.kickedBy = null;
     }
 }
