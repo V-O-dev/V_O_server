@@ -32,6 +32,15 @@ public record FeedItemResponse(
         @Schema(description = "영상 길이(ms)", nullable = true)
         Integer durationMs,
 
+        @Schema(description = "좋아요 수")
+        long reactionCount,
+
+        @Schema(description = "조회자의 좋아요 여부")
+        boolean reactedByMe,
+
+        @Schema(description = "삭제되지 않은 댓글 수")
+        long commentCount,
+
         @Schema(description = "촬영 시각", nullable = true)
         LocalDateTime capturedAt,
 

@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.example.v_o_server.domain.answer.entity.AnswerUploadStatus;
 import com.example.v_o_server.domain.answer.entity.DailyAnswer;
@@ -13,6 +14,9 @@ import com.example.v_o_server.domain.answer.entity.VideoStatus;
 import com.example.v_o_server.domain.answer.repository.DailyAnswerRepository;
 import com.example.v_o_server.domain.answer.repository.VideoRepository;
 import com.example.v_o_server.domain.feed.dto.FeedResponse;
+import com.example.v_o_server.domain.feed.repository.FeedCommentQueryRepository;
+import com.example.v_o_server.domain.feed.repository.FeedCountProjection;
+import com.example.v_o_server.domain.feed.repository.FeedReactionQueryRepository;
 import com.example.v_o_server.domain.group.service.GroupAccessGuard;
 import com.example.v_o_server.domain.question.entity.Question;
 import com.example.v_o_server.domain.question.entity.QuestionStatus;
@@ -44,6 +48,8 @@ class FeedServiceTest {
     private DailyAnswerRepository dailyAnswerRepository;
     private VideoRepository videoRepository;
     private UserProfileRepository userProfileRepository;
+    private FeedReactionQueryRepository feedReactionQueryRepository;
+    private FeedCommentQueryRepository feedCommentQueryRepository;
     private FeedService feedService;
 
     @BeforeEach
@@ -52,11 +58,15 @@ class FeedServiceTest {
         dailyAnswerRepository = org.mockito.Mockito.mock(DailyAnswerRepository.class);
         videoRepository = org.mockito.Mockito.mock(VideoRepository.class);
         userProfileRepository = org.mockito.Mockito.mock(UserProfileRepository.class);
+        feedReactionQueryRepository = org.mockito.Mockito.mock(FeedReactionQueryRepository.class);
+        feedCommentQueryRepository = org.mockito.Mockito.mock(FeedCommentQueryRepository.class);
         feedService = new FeedService(
                 groupAccessGuard,
                 dailyAnswerRepository,
                 videoRepository,
-                userProfileRepository
+                userProfileRepository,
+                feedReactionQueryRepository,
+                feedCommentQueryRepository
         );
     }
 
@@ -76,6 +86,7 @@ class FeedServiceTest {
         verify(groupAccessGuard).assertMember(GROUP_ID, USER_ID);
         verify(videoRepository, never())
                 .findByGroupIdAndDailyAnswerServiceDateAndStatus(any(), any(), any(), any());
+        verifyNoInteractions(feedReactionQueryRepository, feedCommentQueryRepository);
     }
 
     @Test
@@ -93,6 +104,7 @@ class FeedServiceTest {
         assertThat(response.size()).isEqualTo(10);
         verify(videoRepository, never())
                 .findByGroupIdAndDailyAnswerServiceDateAndStatus(any(), any(), any(), any());
+        verifyNoInteractions(feedReactionQueryRepository, feedCommentQueryRepository);
     }
 
     @Test
@@ -115,6 +127,12 @@ class FeedServiceTest {
                 any(Pageable.class)
         )).willReturn(new PageImpl<>(List.of(video), repositoryPage, 3));
         given(userProfileRepository.findAllById(any())).willReturn(List.of(profile));
+        given(feedReactionQueryRepository.countByVideoIds(List.of(100L)))
+                .willReturn(List.of(count(100L, 4L)));
+        given(feedReactionQueryRepository.findReactedVideoIds(USER_ID, List.of(100L)))
+                .willReturn(List.of(100L));
+        given(feedCommentQueryRepository.countActiveByVideoIds(List.of(100L)))
+                .willReturn(List.of(count(100L, 2L)));
 
         FeedResponse response = feedService.getFeed(USER_ID, GROUP_ID, SERVICE_DATE, 0, 2);
 
@@ -130,6 +148,9 @@ class FeedServiceTest {
             assertThat(item.questionId()).isEqualTo(30L);
             assertThat(item.questionContent()).isEqualTo("오늘 가장 웃겼던 일은?");
             assertThat(item.videoUrl()).isEqualTo("https://cdn.example.com/video.mp4");
+            assertThat(item.reactionCount()).isEqualTo(4);
+            assertThat(item.reactedByMe()).isTrue();
+            assertThat(item.commentCount()).isEqualTo(2);
             assertThat(item.uploadedAt()).isEqualTo(uploadedAt);
         });
 
@@ -142,6 +163,20 @@ class FeedServiceTest {
         );
         assertThat(pageableCaptor.getValue().getSort().getOrderFor("uploadedAt").isDescending()).isTrue();
         assertThat(pageableCaptor.getValue().getSort().getOrderFor("id").isDescending()).isTrue();
+    }
+
+    private FeedCountProjection count(Long videoId, Long totalCount) {
+        return new FeedCountProjection() {
+            @Override
+            public Long getVideoId() {
+                return videoId;
+            }
+
+            @Override
+            public Long getTotalCount() {
+                return totalCount;
+            }
+        };
     }
 
     private DailyAnswer answer(AnswerUploadStatus status) {

@@ -8,11 +8,16 @@ import com.example.v_o_server.domain.answer.repository.DailyAnswerRepository;
 import com.example.v_o_server.domain.answer.repository.VideoRepository;
 import com.example.v_o_server.domain.feed.dto.FeedItemResponse;
 import com.example.v_o_server.domain.feed.dto.FeedResponse;
+import com.example.v_o_server.domain.feed.repository.FeedCommentQueryRepository;
+import com.example.v_o_server.domain.feed.repository.FeedCountProjection;
+import com.example.v_o_server.domain.feed.repository.FeedReactionQueryRepository;
 import com.example.v_o_server.domain.group.service.GroupAccessGuard;
 import com.example.v_o_server.domain.user.entity.UserProfile;
 import com.example.v_o_server.domain.user.repository.UserProfileRepository;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +36,8 @@ public class FeedService {
     private final DailyAnswerRepository dailyAnswerRepository;
     private final VideoRepository videoRepository;
     private final UserProfileRepository userProfileRepository;
+    private final FeedReactionQueryRepository feedReactionQueryRepository;
+    private final FeedCommentQueryRepository feedCommentQueryRepository;
 
     public FeedResponse getFeed(
             Long userId,
@@ -65,18 +72,47 @@ public class FeedService {
                 pageable
         );
 
+        List<Long> videoIds = videos.stream().map(Video::getId).toList();
         Map<Long, UserProfile> profilesByUserId = userProfileRepository.findAllById(
                         videos.stream().map(video -> video.getUser().getId()).collect(Collectors.toSet())
                 )
                 .stream()
                 .collect(Collectors.toMap(UserProfile::getId, Function.identity()));
+        Map<Long, Long> reactionCounts = countByVideoId(
+                videoIds.isEmpty() ? List.of() : feedReactionQueryRepository.countByVideoIds(videoIds)
+        );
+        Map<Long, Long> commentCounts = countByVideoId(
+                videoIds.isEmpty() ? List.of() : feedCommentQueryRepository.countActiveByVideoIds(videoIds)
+        );
+        Set<Long> reactedVideoIds = videoIds.isEmpty()
+                ? Set.of()
+                : Set.copyOf(feedReactionQueryRepository.findReactedVideoIds(userId, videoIds));
 
         Page<FeedItemResponse> items = videos.map(video ->
-                toFeedItem(video, profilesByUserId.get(video.getUser().getId())));
+                toFeedItem(
+                        video,
+                        profilesByUserId.get(video.getUser().getId()),
+                        reactionCounts.getOrDefault(video.getId(), 0L),
+                        reactedVideoIds.contains(video.getId()),
+                        commentCounts.getOrDefault(video.getId(), 0L)
+                ));
         return FeedResponse.unlocked(serviceDate, viewerStatus, items);
     }
 
-    private FeedItemResponse toFeedItem(Video video, UserProfile profile) {
+    private Map<Long, Long> countByVideoId(List<FeedCountProjection> counts) {
+        return counts.stream().collect(Collectors.toMap(
+                FeedCountProjection::getVideoId,
+                FeedCountProjection::getTotalCount
+        ));
+    }
+
+    private FeedItemResponse toFeedItem(
+            Video video,
+            UserProfile profile,
+            long reactionCount,
+            boolean reactedByMe,
+            long commentCount
+    ) {
         return new FeedItemResponse(
                 video.getId(),
                 video.getUser().getId(),
@@ -87,6 +123,9 @@ public class FeedService {
                 video.getVideoUrl(),
                 video.getThumbnailUrl(),
                 video.getDurationMs(),
+                reactionCount,
+                reactedByMe,
+                commentCount,
                 video.getCapturedAt(),
                 video.getUploadedAt()
         );

@@ -66,6 +66,9 @@ class FeedControllerTest {
                 "https://cdn.example.com/video.mp4",
                 "https://cdn.example.com/thumbnail.jpg",
                 10_000,
+                4,
+                true,
+                2,
                 LocalDateTime.of(2026, 7, 24, 11, 59, 50),
                 LocalDateTime.of(2026, 7, 24, 12, 0)
         );
@@ -93,6 +96,9 @@ class FeedControllerTest {
                 .andExpect(jsonPath("$.data.items[0].nickname").value("동구"))
                 .andExpect(jsonPath("$.data.items[0].questionContent")
                         .value("오늘 가장 웃겼던 일은?"))
+                .andExpect(jsonPath("$.data.items[0].reactionCount").value(4))
+                .andExpect(jsonPath("$.data.items[0].reactedByMe").value(true))
+                .andExpect(jsonPath("$.data.items[0].commentCount").value(2))
                 .andExpect(jsonPath("$.data.hasNext").value(false));
 
         verify(feedService).getFeed(AUTH_USER_ID, GROUP_ID, SERVICE_DATE, 0, 20);
