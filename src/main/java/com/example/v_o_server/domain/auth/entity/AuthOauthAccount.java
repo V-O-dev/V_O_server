@@ -78,4 +78,22 @@ public class AuthOauthAccount {
         this.status = status;
         this.user = user;
     }
+
+    public void recordLogin(LocalDateTime now) {
+        if (this.linkedAt == null) {
+            this.linkedAt = now;
+        }
+        this.lastLoginAt = now;
+    }
+
+    public void unlink(LocalDateTime now) {
+        this.status = OauthAccountStatus.UNLINKED;
+        this.unlinkedAt = now;
+    }
+
+    public void relink(LocalDateTime now) {
+        this.status = OauthAccountStatus.ACTIVE;
+        this.unlinkedAt = null;
+        recordLogin(now);
+    }
 }

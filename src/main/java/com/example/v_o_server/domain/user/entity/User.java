@@ -49,4 +49,18 @@ public class User extends BaseTimeEntity {
         this.dailyQuestionNotificationEnabled = dailyQuestionNotificationEnabled;
         this.interactionNotificationEnabled = interactionNotificationEnabled;
     }
+
+    public void updateLastLoginAt(LocalDateTime now) {
+        this.lastLoginAt = now;
+    }
+
+    public void withdraw(LocalDateTime now) {
+        this.status = UserStatus.WITHDRAWN;
+        this.withdrawnAt = now;
+    }
+
+    public void updateNotificationSettings(Boolean dailyQuestionNotificationEnabled, Boolean interactionNotificationEnabled) {
+        this.dailyQuestionNotificationEnabled = dailyQuestionNotificationEnabled;
+        this.interactionNotificationEnabled = interactionNotificationEnabled;
+    }
 }

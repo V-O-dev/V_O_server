@@ -61,4 +61,10 @@ public class PushDevice {
         this.appVersion = appVersion;
         this.isEnabled = isEnabled;
     }
+
+    public void updateToken(String deviceToken, String appVersion) {
+        this.deviceToken = deviceToken;
+        this.appVersion = appVersion;
+        this.isEnabled = true;
+    }
 }
