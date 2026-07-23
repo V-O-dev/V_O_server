@@ -6,7 +6,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Locale;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,6 +23,7 @@ public class LocalFileStorageService implements FileStorageService {
 
     private static final String BASE_DIR = "uploads";
     private static final String BASE_URL = "http://localhost:8080/uploads";
+    private static final Pattern SAFE_EXTENSION = Pattern.compile("\\.[a-z0-9]{1,10}");
 
     @Override
     public StoredFile upload(MultipartFile file, String directory) {
@@ -58,6 +61,9 @@ public class LocalFileStorageService implements FileStorageService {
         if (originalFilename == null || !originalFilename.contains(".")) {
             return "";
         }
-        return originalFilename.substring(originalFilename.lastIndexOf("."));
+        String normalizedFilename = originalFilename.replace('\\', '/');
+        String filename = normalizedFilename.substring(normalizedFilename.lastIndexOf('/') + 1);
+        String extension = filename.substring(filename.lastIndexOf(".")).toLowerCase(Locale.ROOT);
+        return SAFE_EXTENSION.matcher(extension).matches() ? extension : "";
     }
 }
