@@ -132,4 +132,30 @@ class ArchiveControllerTest {
                 .andExpect(jsonPath("$.data.records[0].thumbnailUrl")
                         .value("https://cdn.example.com/thumbnails/10.jpg"));
     }
+
+    @Test
+    @DisplayName("캘린더 조회에서 groupId를 생략하면 서비스에 null(통합 조회)이 전달된다")
+    void getCalendarWithoutGroupId() throws Exception {
+        given(archiveService.getCalendar(AUTH_USER_ID, null, 2026, 7))
+                .willReturn(new ArchiveCalendarResponse(2026, 7, List.of(3)));
+
+        mockMvc.perform(get("/api/v1/archives/calendar")
+                        .param("year", "2026").param("month", "7")
+                        .with(authUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.recordDates[0]").value(3));
+    }
+
+    @Test
+    @DisplayName("일자별 조회에서 groupId를 생략하면 서비스에 null(통합 조회)이 전달된다")
+    void getDailyWithoutGroupId() throws Exception {
+        given(archiveService.getDailyRecords(AUTH_USER_ID, null, LocalDate.of(2026, 7, 17)))
+                .willReturn(new ArchiveDailyResponse(List.of()));
+
+        mockMvc.perform(get("/api/v1/archives/daily").param("date", "2026-07-17")
+                        .with(authUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.records").isEmpty());
+    }
 }
