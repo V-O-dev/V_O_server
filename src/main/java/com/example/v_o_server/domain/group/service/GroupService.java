@@ -2,7 +2,8 @@ package com.example.v_o_server.domain.group.service;
 
 import com.example.v_o_server.common.exception.BusinessException;
 import com.example.v_o_server.common.exception.ErrorCode;
-import com.example.v_o_server.common.storage.GroupImageStorage;
+import com.example.v_o_server.common.storage.FileStorageService;
+import com.example.v_o_server.common.storage.FileStorageService.StoredFile;
 import com.example.v_o_server.domain.group.dto.GroupCreateRequest;
 import com.example.v_o_server.domain.group.dto.GroupCreateResponse;
 import com.example.v_o_server.domain.group.dto.GroupDetailResponse;
@@ -37,6 +38,8 @@ public class GroupService {
     /** ERD 기본값. */
     private static final String DEFAULT_TIMEZONE = "Asia/Seoul";
     private static final int DEFAULT_MAX_MEMBERS = 15;
+    /** 그룹 이미지 저장 디렉터리 (FileStorageService). */
+    private static final String GROUP_IMAGE_DIR = "group-images";
 
     private final PrivateGroupRepository privateGroupRepository;
     private final GroupMemberRepository groupMemberRepository;
@@ -44,7 +47,7 @@ public class GroupService {
     private final GroupThemeRepository groupThemeRepository;
     private final UserRepository userRepository;
     private final GroupAccessGuard accessGuard;
-    private final GroupImageStorage groupImageStorage;
+    private final FileStorageService fileStorageService;
 
     /** G1 그룹 생성 (이미지 없음) — JSON 요청 경로. */
     @Transactional
@@ -70,9 +73,9 @@ public class GroupService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.THEME_NOT_FOUND));
 
         // 검증을 모두 통과한 뒤에 저장한다 — 실패한 요청의 이미지가 스토리지에 남지 않도록.
-        GroupImageStorage.StoredImage stored = (image != null && !image.isEmpty())
-                ? groupImageStorage.store(image)
-                : new GroupImageStorage.StoredImage(null, null);
+        StoredFile stored = (image != null && !image.isEmpty())
+                ? fileStorageService.upload(image, GROUP_IMAGE_DIR)
+                : new StoredFile(null, null);
 
         PrivateGroup group = privateGroupRepository.save(PrivateGroup.builder()
                 .owner(owner)
@@ -154,7 +157,7 @@ public class GroupService {
             group.updateName(request.groupName());
         }
         if (hasImage) {
-            GroupImageStorage.StoredImage stored = groupImageStorage.store(image);
+            StoredFile stored = fileStorageService.upload(image, GROUP_IMAGE_DIR);
             group.updateImage(stored.url(), stored.objectKey());
         }
 

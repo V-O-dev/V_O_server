@@ -15,7 +15,7 @@ import static org.mockito.Mockito.verify;
 
 import com.example.v_o_server.common.exception.BusinessException;
 import com.example.v_o_server.common.exception.ErrorCode;
-import com.example.v_o_server.common.storage.GroupImageStorage;
+import com.example.v_o_server.common.storage.FileStorageService;
 import com.example.v_o_server.domain.group.dto.GroupCreateRequest;
 import com.example.v_o_server.domain.group.dto.GroupCreateResponse;
 import com.example.v_o_server.domain.group.dto.GroupUpdateRequest;
@@ -64,7 +64,7 @@ class GroupServiceTest {
     @Mock
     private GroupAccessGuard accessGuard;
     @Mock
-    private GroupImageStorage groupImageStorage;
+    private FileStorageService fileStorageService;
 
     @InjectMocks
     private GroupService groupService;
@@ -111,8 +111,8 @@ class GroupServiceTest {
                     .willReturn(false);
             given(userRepository.findById(USER_ID)).willReturn(Optional.of(owner));
             given(groupThemeRepository.findByCode("FAMILY")).willReturn(Optional.of(theme(1L, "FAMILY")));
-            given(groupImageStorage.store(image))
-                    .willReturn(new GroupImageStorage.StoredImage("https://cdn/a.png", "key/a.png"));
+            given(fileStorageService.upload(eq(image), any()))
+                    .willReturn(new FileStorageService.StoredFile("https://cdn/a.png", "key/a.png"));
             given(privateGroupRepository.save(any(PrivateGroup.class))).willReturn(group);
             given(groupMemberRepository.save(any(GroupMember.class)))
                     .willReturn(member(1L, group, owner, GroupMemberRole.OWNER, MemberStatus.ACTIVE));
@@ -138,7 +138,7 @@ class GroupServiceTest {
                     USER_ID, createRequest("우리 가족", LocalTime.of(20, 0), LocalTime.of(21, 0)), image))
                     .isInstanceOf(BusinessException.class);
 
-            verify(groupImageStorage, never()).store(any());
+            verify(fileStorageService, never()).upload(any(), any());
         }
 
         @Test
@@ -220,8 +220,8 @@ class GroupServiceTest {
                     new MockMultipartFile("image", "a.png", "image/png", new byte[]{1, 2, 3});
 
             given(accessGuard.getActiveGroup(GROUP_ID)).willReturn(group);
-            given(groupImageStorage.store(image))
-                    .willReturn(new GroupImageStorage.StoredImage("https://cdn/a.png", "key/a.png"));
+            given(fileStorageService.upload(eq(image), any()))
+                    .willReturn(new FileStorageService.StoredFile("https://cdn/a.png", "key/a.png"));
             given(groupMemberRepository.findByGroupIdAndStatus(GROUP_ID, MemberStatus.ACTIVE))
                     .willReturn(List.of(member(1L, group, owner, GroupMemberRole.OWNER, MemberStatus.ACTIVE)));
 

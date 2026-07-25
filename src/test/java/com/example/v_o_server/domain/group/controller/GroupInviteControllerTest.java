@@ -9,7 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.v_o_server.common.exception.BusinessException;
 import com.example.v_o_server.common.exception.ErrorCode;
-import com.example.v_o_server.common.security.CurrentUserProvider;
 import com.example.v_o_server.common.security.JwtAuthenticationFilter;
 import com.example.v_o_server.config.SecurityConfig;
 import com.example.v_o_server.domain.group.service.GroupInviteService;
@@ -32,7 +31,6 @@ import org.springframework.test.web.servlet.MockMvc;
 @DisplayName("GroupInviteController")
 class GroupInviteControllerTest {
 
-    private static final Long USER_ID = 1L;
     private static final String CODE = "A3F9K2";
 
     @Autowired
@@ -40,17 +38,14 @@ class GroupInviteControllerTest {
 
     @MockitoBean
     private GroupInviteService groupInviteService;
-    @MockitoBean
-    private CurrentUserProvider currentUserProvider;
 
     @Test
     @DisplayName("QR 요청은 PNG 바이트와 캐시 헤더를 반환한다")
     void returnsQrPng() throws Exception {
         byte[] png = {(byte) 0x89, 'P', 'N', 'G'};
-        given(currentUserProvider.getCurrentUserId()).willReturn(USER_ID);
         given(groupInviteService.getInviteQrImage(CODE, null)).willReturn(png);
 
-        mockMvc.perform(get("/invites/{code}/qr", CODE))
+        mockMvc.perform(get("/api/v1/invites/{code}/qr", CODE))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.IMAGE_PNG))
                 .andExpect(content().bytes(png))
@@ -60,21 +55,19 @@ class GroupInviteControllerTest {
     @Test
     @DisplayName("size 파라미터는 서비스로 그대로 전달된다")
     void passesSizeParameter() throws Exception {
-        given(currentUserProvider.getCurrentUserId()).willReturn(USER_ID);
         given(groupInviteService.getInviteQrImage(CODE, 256)).willReturn(new byte[]{1});
 
-        mockMvc.perform(get("/invites/{code}/qr", CODE).param("size", "256"))
+        mockMvc.perform(get("/api/v1/invites/{code}/qr", CODE).param("size", "256"))
                 .andExpect(status().isOk());
     }
 
     @Test
     @DisplayName("만료된 코드의 QR 요청은 G007 INVITE_EXPIRED")
     void expiredCodeReturnsError() throws Exception {
-        given(currentUserProvider.getCurrentUserId()).willReturn(USER_ID);
         given(groupInviteService.getInviteQrImage(CODE, null))
                 .willThrow(new BusinessException(ErrorCode.INVITE_EXPIRED));
 
-        mockMvc.perform(get("/invites/{code}/qr", CODE))
+        mockMvc.perform(get("/api/v1/invites/{code}/qr", CODE))
                 .andExpect(status().isGone())
                 .andExpect(jsonPath("$.code").value("G007"));
     }

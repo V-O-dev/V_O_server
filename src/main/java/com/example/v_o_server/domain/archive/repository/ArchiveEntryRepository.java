@@ -3,6 +3,7 @@ package com.example.v_o_server.domain.archive.repository;
 import com.example.v_o_server.domain.archive.entity.ArchiveEntry;
 import java.time.LocalDate;
 import java.util.List;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -27,5 +28,7 @@ public interface ArchiveEntryRepository extends JpaRepository<ArchiveEntry, Long
                                     @Param("endDate") LocalDate endDate);
 
     /** 특정 그룹·일자의 내 기록 카드 목록. */
-    List<ArchiveEntry> findByUserIdAndGroupIdAndRecordDate(Long userId, Long groupId, LocalDate recordDate);
+    @EntityGraph(attributePaths = "video")
+    List<ArchiveEntry> findByUserIdAndGroupIdAndRecordDateOrderByIdAsc(
+            Long userId, Long groupId, LocalDate recordDate);
 }

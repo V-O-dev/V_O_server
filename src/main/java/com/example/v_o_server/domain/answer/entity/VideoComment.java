@@ -55,4 +55,18 @@ public class VideoComment extends BaseTimeEntity {
         this.content = content;
         this.isDeleted = isDeleted;
     }
+
+    public boolean isWrittenBy(Long userId) {
+        return this.user.getId().equals(userId);
+    }
+
+    public void updateContent(String content, LocalDateTime now) {
+        this.content = content;
+        this.editedAt = now;
+    }
+
+    public void delete(LocalDateTime now) {
+        this.isDeleted = true;
+        this.deletedAt = now;
+    }
 }

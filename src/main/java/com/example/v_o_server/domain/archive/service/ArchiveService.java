@@ -4,7 +4,6 @@ import com.example.v_o_server.domain.archive.dto.ArchiveCalendarResponse;
 import com.example.v_o_server.domain.archive.dto.ArchiveDailyResponse;
 import com.example.v_o_server.domain.archive.dto.ArchiveRecordResponse;
 import com.example.v_o_server.domain.archive.repository.ArchiveEntryRepository;
-import com.example.v_o_server.domain.group.service.GroupAccessGuard;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
@@ -24,13 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class ArchiveService {
 
     private final ArchiveEntryRepository archiveEntryRepository;
-    private final GroupAccessGuard accessGuard;
 
     /** A1 캘린더(월별 Dot) 조회. */
     public ArchiveCalendarResponse getCalendar(Long userId, Long groupId, int year, int month) {
-        accessGuard.getActiveGroup(groupId);
-        accessGuard.assertMember(groupId, userId);
-
         YearMonth yearMonth = YearMonth.of(year, month);
         List<Integer> days = archiveEntryRepository
                 .findRecordDates(userId, groupId, yearMonth.atDay(1), yearMonth.atEndOfMonth())
@@ -42,11 +37,8 @@ public class ArchiveService {
 
     /** A2 일자별 기록 조회 — 기록이 없으면 빈 목록(정상 응답). */
     public ArchiveDailyResponse getDailyRecords(Long userId, Long groupId, LocalDate date) {
-        accessGuard.getActiveGroup(groupId);
-        accessGuard.assertMember(groupId, userId);
-
         List<ArchiveRecordResponse> records = archiveEntryRepository
-                .findByUserIdAndGroupIdAndRecordDate(userId, groupId, date).stream()
+                .findByUserIdAndGroupIdAndRecordDateOrderByIdAsc(userId, groupId, date).stream()
                 .map(ArchiveRecordResponse::from)
                 .toList();
         return new ArchiveDailyResponse(records);
