@@ -50,7 +50,7 @@ public class ArchiveEntry extends BaseCreatedAtEntity {
     private DailyAnswer dailyAnswer;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "video_id")
+    @JoinColumn(name = "video_id", nullable = false)
     private Video video;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -60,13 +60,13 @@ public class ArchiveEntry extends BaseCreatedAtEntity {
     @Column(name = "record_date", nullable = false)
     private LocalDate recordDate;
 
-    @Column(name = "question_content_snapshot")
+    @Column(name = "question_content_snapshot", nullable = false, length = 500)
     private String questionContentSnapshot;
 
-    @Column(name = "group_name_snapshot")
+    @Column(name = "group_name_snapshot", nullable = false, length = 50)
     private String groupNameSnapshot;
 
-    @Column(name = "group_theme_snapshot")
+    @Column(name = "group_theme_snapshot", length = 80)
     private String groupThemeSnapshot;
 
     @Builder

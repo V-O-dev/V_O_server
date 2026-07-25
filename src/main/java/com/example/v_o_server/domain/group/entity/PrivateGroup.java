@@ -1,5 +1,6 @@
 package com.example.v_o_server.domain.group.entity;
 
+import com.example.v_o_server.common.entity.BaseTimeEntity;
 import com.example.v_o_server.domain.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -23,7 +24,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "private_groups")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class PrivateGroup {
+public class PrivateGroup extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,32 +36,32 @@ public class PrivateGroup {
     private User owner;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "theme_id")
+    @JoinColumn(name = "theme_id", nullable = false)
     private GroupTheme theme;
 
-    @Column(name = "name", nullable = false)
+    @Column(name = "name", nullable = false, length = 15)
     private String name;
 
-    @Column(name = "group_image_url")
+    @Column(name = "group_image_url", length = 1000)
     private String groupImageUrl;
 
-    @Column(name = "group_image_object_key")
+    @Column(name = "group_image_object_key", length = 500)
     private String groupImageObjectKey;
 
-    @Column(name = "notification_start_time")
+    @Column(name = "notification_start_time", nullable = false)
     private LocalTime notificationStartTime;
 
-    @Column(name = "notification_end_time")
+    @Column(name = "notification_end_time", nullable = false)
     private LocalTime notificationEndTime;
 
-    @Column(name = "timezone")
+    @Column(name = "timezone", nullable = false, length = 60)
     private String timezone;
 
-    @Column(name = "max_members")
+    @Column(name = "max_members", nullable = false)
     private Integer maxMembers;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status", nullable = false, length = 30)
     private GroupStatus status;
 
     @Column(name = "deleted_at")
@@ -80,5 +81,28 @@ public class PrivateGroup {
         this.timezone = timezone;
         this.maxMembers = maxMembers;
         this.status = status;
+    }
+
+    public boolean isActive() {
+        return status == GroupStatus.ACTIVE;
+    }
+
+    public void updateName(String name) {
+        this.name = name;
+    }
+
+    public void updateImage(String groupImageUrl, String groupImageObjectKey) {
+        this.groupImageUrl = groupImageUrl;
+        this.groupImageObjectKey = groupImageObjectKey;
+    }
+
+    public void changeOwner(User newOwner) {
+        this.owner = newOwner;
+    }
+
+    /** 소프트 삭제. */
+    public void softDelete(LocalDateTime deletedAt) {
+        this.status = GroupStatus.DELETED;
+        this.deletedAt = deletedAt;
     }
 }
