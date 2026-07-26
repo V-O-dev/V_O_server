@@ -1,5 +1,7 @@
 HELP.md
 .env
+token.txt
+uploads/
 .gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar

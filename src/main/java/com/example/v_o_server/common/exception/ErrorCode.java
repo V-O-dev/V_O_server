@@ -73,7 +73,10 @@ public enum ErrorCode {
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "V003", "댓글을 찾을 수 없습니다."),
     COMMENT_NO_PERMISSION(HttpStatus.FORBIDDEN, "V004", "댓글 작성자만 수정/삭제할 수 있습니다."),
     COMMENT_TOO_LONG(HttpStatus.BAD_REQUEST, "V005", "댓글은 최대 100자까지 입력 가능합니다."),
-    COMMENT_BLANK(HttpStatus.BAD_REQUEST, "V006", "댓글 내용을 입력해주세요.");
+    COMMENT_BLANK(HttpStatus.BAD_REQUEST, "V006", "댓글 내용을 입력해주세요."),
+    DAILY_QUESTION_NOT_ASSIGNED(HttpStatus.BAD_REQUEST, "V007", "오늘 배정된 질문이 없습니다."),
+    QUESTION_MISMATCH(HttpStatus.BAD_REQUEST, "V008", "요청한 질문이 오늘 배정된 질문과 일치하지 않습니다."),
+    ALREADY_UPLOADED_TODAY(HttpStatus.CONFLICT, "V009", "오늘 이미 답변 영상을 업로드했습니다.");
     private final HttpStatus status;
     private final String code;
     private final String message;
