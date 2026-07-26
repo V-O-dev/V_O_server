@@ -2,9 +2,10 @@ package com.example.v_o_server.common.exception;
 
 import com.example.v_o_server.common.response.ApiResponse;
 import com.example.v_o_server.common.response.ApiResponse.FieldError;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Path;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -46,6 +47,22 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 쿼리 파라미터/경로 변수 검증 실패 (@Validated + @NotBlank/@Min 등).
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleConstraintViolation(ConstraintViolationException e) {
+        List<FieldError> errors = e.getConstraintViolations().stream()
+                .map(violation -> new FieldError(
+                        lastPathNode(violation.getPropertyPath()),
+                        violation.getInvalidValue() == null ? "" : violation.getInvalidValue().toString(),
+                        violation.getMessage()))
+                .toList();
+        log.warn("Parameter validation failed: {}", errors);
+        return ResponseEntity.status(ErrorCode.INVALID_INPUT_VALUE.getStatus())
+                .body(ApiResponse.error(ErrorCode.INVALID_INPUT_VALUE, errors));
+    }
+
+    /**
      * 필수 요청 파라미터 누락.
      */
     @ExceptionHandler(MissingServletRequestParameterException.class)
@@ -63,16 +80,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ErrorCode.INVALID_TYPE_VALUE.getStatus())
                 .body(ApiResponse.error(ErrorCode.INVALID_TYPE_VALUE,
                         "파라미터 '" + e.getName() + "'의 타입이 올바르지 않습니다."));
-    }
-
-    /**
-     * 요청 바디 파싱 실패 (JSON 형식 오류, enum에 없는 값 등).
-     */
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ApiResponse<Void>> handleMessageNotReadable(HttpMessageNotReadableException e) {
-        log.warn("Malformed request body: {}", e.getMessage());
-        return ResponseEntity.status(ErrorCode.INVALID_INPUT_VALUE.getStatus())
-                .body(ApiResponse.error(ErrorCode.INVALID_INPUT_VALUE));
     }
 
     /**
@@ -101,6 +108,15 @@ public class GlobalExceptionHandler {
         log.error("Unhandled exception", e);
         return ResponseEntity.status(ErrorCode.INTERNAL_SERVER_ERROR.getStatus())
                 .body(ApiResponse.error(ErrorCode.INTERNAL_SERVER_ERROR));
+    }
+
+    /** 검증 대상 경로("method.arg")에서 마지막 노드만 필드명으로 사용한다. */
+    private String lastPathNode(Path propertyPath) {
+        String last = "";
+        for (Path.Node node : propertyPath) {
+            last = node.getName();
+        }
+        return last;
     }
 
     private List<FieldError> toFieldErrors(BindingResult bindingResult) {

@@ -7,7 +7,7 @@ import org.springframework.http.HttpStatus;
 /**
  * 애플리케이션 전역 에러 코드 정의.
  *
- * <p>code 접두사 규칙: C=공통, 이후 도메인별로 A(auth), U(user) 등을 추가하세요.</p>
+ * <p>code 접두사 규칙: C=공통, A=인증/인가, U=user, G=group.</p>
  */
 @Getter
 @RequiredArgsConstructor
@@ -20,6 +20,7 @@ public enum ErrorCode {
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C004", "서버 내부 오류가 발생했습니다."),
     INVALID_TYPE_VALUE(HttpStatus.BAD_REQUEST, "C005", "요청 파라미터 타입이 올바르지 않습니다."),
     MISSING_REQUEST_PARAMETER(HttpStatus.BAD_REQUEST, "C006", "필수 요청 파라미터가 누락되었습니다."),
+    TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "C007", "요청이 너무 잦습니다. 잠시 후 다시 시도해주세요."),
 
     // 인증/인가
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "A001", "인증이 필요합니다."),
@@ -49,11 +50,30 @@ public enum ErrorCode {
 
     // 그룹
     GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "G001", "그룹을 찾을 수 없습니다."),
-    GROUP_THEME_NOT_SET(HttpStatus.BAD_REQUEST, "G002", "그룹에 테마가 설정되어 있지 않습니다."),
+    GROUP_NAME_DUPLICATED(HttpStatus.CONFLICT, "G002", "이미 사용 중인 그룹명입니다."),
+    NOT_GROUP_MEMBER(HttpStatus.FORBIDDEN, "G003", "그룹 멤버가 아닙니다."),
+    NOT_GROUP_OWNER(HttpStatus.FORBIDDEN, "G004", "그룹 방장만 수행할 수 있습니다."),
+    GROUP_FULL(HttpStatus.CONFLICT, "G005", "그룹 정원이 가득 찼습니다."),
+    INVITE_NOT_FOUND(HttpStatus.NOT_FOUND, "G006", "초대 정보를 찾을 수 없습니다."),
+    INVITE_EXPIRED(HttpStatus.GONE, "G007", "만료된 초대 코드입니다."),
+    ALREADY_GROUP_MEMBER(HttpStatus.CONFLICT, "G008", "이미 가입된 그룹입니다."),
+    OWNER_CANNOT_LEAVE(HttpStatus.CONFLICT, "G009", "방장은 권한을 위임한 뒤 나갈 수 있습니다."),
+    CANNOT_KICK_SELF(HttpStatus.BAD_REQUEST, "G010", "자기 자신을 강제 퇴장시킬 수 없습니다."),
+    MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "G011", "그룹 멤버를 찾을 수 없습니다."),
+    THEME_NOT_FOUND(HttpStatus.NOT_FOUND, "G012", "그룹 테마를 찾을 수 없습니다."),
+    INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "G013", "알림 시간 범위가 올바르지 않습니다."),
+    GROUP_THEME_NOT_SET(HttpStatus.BAD_REQUEST, "G014", "그룹에 테마가 설정되어 있지 않습니다."),
 
     // 질문
-    NO_QUESTION_CANDIDATE(HttpStatus.NOT_FOUND, "Q001", "테마에 해당하는 추천 가능한 질문이 없습니다.");
+    NO_QUESTION_CANDIDATE(HttpStatus.NOT_FOUND, "Q001", "테마에 해당하는 추천 가능한 질문이 없습니다."),
 
+    // 영상/리액션/댓글
+    VIDEO_NOT_FOUND(HttpStatus.NOT_FOUND, "V001", "영상을 찾을 수 없습니다."),
+    FEED_LOCKED(HttpStatus.FORBIDDEN, "V002", "오늘의 답변을 완료해야 확인할 수 있습니다."),
+    COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "V003", "댓글을 찾을 수 없습니다."),
+    COMMENT_NO_PERMISSION(HttpStatus.FORBIDDEN, "V004", "댓글 작성자만 수정/삭제할 수 있습니다."),
+    COMMENT_TOO_LONG(HttpStatus.BAD_REQUEST, "V005", "댓글은 최대 100자까지 입력 가능합니다."),
+    COMMENT_BLANK(HttpStatus.BAD_REQUEST, "V006", "댓글 내용을 입력해주세요.");
     private final HttpStatus status;
     private final String code;
     private final String message;

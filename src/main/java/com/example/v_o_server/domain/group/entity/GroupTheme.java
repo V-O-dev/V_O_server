@@ -23,16 +23,16 @@ public class GroupTheme extends BaseCreatedAtEntity {
     @Column(name = "id")
     private Long id;
 
-    @Column(name = "code", nullable = false, unique = true)
+    @Column(name = "code", nullable = false, unique = true, length = 40)
     private String code;
 
-    @Column(name = "name", nullable = false)
+    @Column(name = "name", nullable = false, length = 80)
     private String name;
 
-    @Column(name = "description")
+    @Column(name = "description", length = 500)
     private String description;
 
-    @Column(name = "sort_order")
+    @Column(name = "sort_order", nullable = false)
     private Integer sortOrder;
 
     @Column(name = "is_active", nullable = false)

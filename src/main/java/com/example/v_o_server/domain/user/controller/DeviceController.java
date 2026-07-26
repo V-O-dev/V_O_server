@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,9 +25,9 @@ public class DeviceController {
 
     @Operation(summary = "디바이스 토큰 등록/갱신", description = "푸시 알림 발송을 위한 디바이스 토큰을 등록하거나 갱신합니다.")
     @PostMapping
-    public ApiResponse<Void> registerDevice(@Valid @RequestBody RegisterDeviceRequest request) {
-        Long tempUserId = 1L;
-        deviceService.registerDevice(tempUserId, request);
+    public ApiResponse<Void> registerDevice(@AuthenticationPrincipal Long userId,
+            @Valid @RequestBody RegisterDeviceRequest request) {
+        deviceService.registerDevice(userId, request);
         return ApiResponse.ok();
     }
 
