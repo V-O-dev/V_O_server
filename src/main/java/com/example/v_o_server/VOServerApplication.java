@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 @ConfigurationPropertiesScan
 @SpringBootApplication
+@ConfigurationPropertiesScan
 public class VOServerApplication {
 
     public static void main(String[] args) {

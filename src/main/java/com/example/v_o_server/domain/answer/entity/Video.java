@@ -94,7 +94,7 @@ public class Video {
     private Video(DailyAnswer dailyAnswer, PrivateGroup group, User user, Question question, String videoUrl,
             String videoObjectKey, String thumbnailUrl, String thumbnailObjectKey, String mimeType,
             Long fileSizeBytes, Integer durationMs, Integer width, Integer height, String cameraFacing,
-            VideoStatus status, LocalDateTime capturedAt) {
+            VideoStatus status, LocalDateTime capturedAt, LocalDateTime uploadedAt) {
         this.dailyAnswer = dailyAnswer;
         this.group = group;
         this.user = user;
@@ -111,5 +111,6 @@ public class Video {
         this.cameraFacing = cameraFacing;
         this.status = status;
         this.capturedAt = capturedAt;
+        this.uploadedAt = uploadedAt;
     }
 }
