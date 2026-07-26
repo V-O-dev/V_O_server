@@ -7,7 +7,7 @@ import org.springframework.http.HttpStatus;
 /**
  * 애플리케이션 전역 에러 코드 정의.
  *
- * <p>code 접두사 규칙: C=공통, A=인증/인가, U=user, G=group.</p>
+ * <p>code 접두사 규칙: C=공통, A=인증/인가, U=user, V=영상/리액션/댓글, G=group, N=알림.</p>
  */
 @Getter
 @RequiredArgsConstructor
@@ -61,8 +61,13 @@ public enum ErrorCode {
     CANNOT_KICK_SELF(HttpStatus.BAD_REQUEST, "G010", "자기 자신을 강제 퇴장시킬 수 없습니다."),
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "G011", "그룹 멤버를 찾을 수 없습니다."),
     THEME_NOT_FOUND(HttpStatus.NOT_FOUND, "G012", "그룹 테마를 찾을 수 없습니다."),
-    INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "G013", "알림 시간 범위가 올바르지 않습니다."),
+    INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "G013", "알림 시간 범위가 올바르지 않습니다."), 
     GROUP_THEME_NOT_SET(HttpStatus.BAD_REQUEST, "G014", "그룹에 테마가 설정되어 있지 않습니다."),
+    
+  // 알림
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "N001", "알림을 찾을 수 없습니다."),
+    NOTIFICATION_NO_PERMISSION(HttpStatus.FORBIDDEN, "N002", "해당 알림에 접근할 권한이 없습니다."),
+
 
     // 질문
     NO_QUESTION_CANDIDATE(HttpStatus.NOT_FOUND, "Q001", "테마에 해당하는 추천 가능한 질문이 없습니다."),
@@ -77,6 +82,10 @@ public enum ErrorCode {
     DAILY_QUESTION_NOT_ASSIGNED(HttpStatus.BAD_REQUEST, "V007", "오늘 배정된 질문이 없습니다."),
     QUESTION_MISMATCH(HttpStatus.BAD_REQUEST, "V008", "요청한 질문이 오늘 배정된 질문과 일치하지 않습니다."),
     ALREADY_UPLOADED_TODAY(HttpStatus.CONFLICT, "V009", "오늘 이미 답변 영상을 업로드했습니다.");
+
+    private final HttpStatus status;
+    private final String code;
+    private final String message;
     private final HttpStatus status;
     private final String code;
     private final String message;
