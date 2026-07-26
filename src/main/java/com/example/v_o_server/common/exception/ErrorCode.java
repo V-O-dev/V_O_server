@@ -48,13 +48,6 @@ public enum ErrorCode {
     DEVICE_TOKEN_REQUIRED(HttpStatus.BAD_REQUEST, "U011", "디바이스 토큰이 필요합니다."),
     INVALID_PLATFORM(HttpStatus.BAD_REQUEST, "U012", "유효하지 않은 플랫폼 값입니다."),
 
-    // 영상/리액션/댓글
-    VIDEO_NOT_FOUND(HttpStatus.NOT_FOUND, "V001", "영상을 찾을 수 없습니다."),
-    FEED_LOCKED(HttpStatus.FORBIDDEN, "V002", "오늘의 답변을 완료해야 확인할 수 있습니다."),
-    COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "V003", "댓글을 찾을 수 없습니다."),
-    COMMENT_NO_PERMISSION(HttpStatus.FORBIDDEN, "V004", "댓글 작성자만 수정/삭제할 수 있습니다."),
-    COMMENT_TOO_LONG(HttpStatus.BAD_REQUEST, "V005", "댓글은 최대 100자까지 입력 가능합니다."),
-    COMMENT_BLANK(HttpStatus.BAD_REQUEST, "V006", "댓글 내용을 입력해주세요."),
     // 그룹
     GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "G001", "그룹을 찾을 수 없습니다."),
     GROUP_NAME_DUPLICATED(HttpStatus.CONFLICT, "G002", "이미 사용 중인 그룹명입니다."),
@@ -68,7 +61,19 @@ public enum ErrorCode {
     CANNOT_KICK_SELF(HttpStatus.BAD_REQUEST, "G010", "자기 자신을 강제 퇴장시킬 수 없습니다."),
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "G011", "그룹 멤버를 찾을 수 없습니다."),
     THEME_NOT_FOUND(HttpStatus.NOT_FOUND, "G012", "그룹 테마를 찾을 수 없습니다."),
-    INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "G013", "알림 시간 범위가 올바르지 않습니다.");
+    INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "G013", "알림 시간 범위가 올바르지 않습니다."),
+    GROUP_THEME_NOT_SET(HttpStatus.BAD_REQUEST, "G014", "그룹에 테마가 설정되어 있지 않습니다."),
+
+    // 질문
+    NO_QUESTION_CANDIDATE(HttpStatus.NOT_FOUND, "Q001", "테마에 해당하는 추천 가능한 질문이 없습니다."),
+
+    // 영상/리액션/댓글
+    VIDEO_NOT_FOUND(HttpStatus.NOT_FOUND, "V001", "영상을 찾을 수 없습니다."),
+    FEED_LOCKED(HttpStatus.FORBIDDEN, "V002", "오늘의 답변을 완료해야 확인할 수 있습니다."),
+    COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "V003", "댓글을 찾을 수 없습니다."),
+    COMMENT_NO_PERMISSION(HttpStatus.FORBIDDEN, "V004", "댓글 작성자만 수정/삭제할 수 있습니다."),
+    COMMENT_TOO_LONG(HttpStatus.BAD_REQUEST, "V005", "댓글은 최대 100자까지 입력 가능합니다."),
+    COMMENT_BLANK(HttpStatus.BAD_REQUEST, "V006", "댓글 내용을 입력해주세요.");
     private final HttpStatus status;
     private final String code;
     private final String message;
