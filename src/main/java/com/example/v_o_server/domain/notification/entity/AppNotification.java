@@ -82,4 +82,17 @@ public class AppNotification extends BaseCreatedAtEntity {
         this.groupDailyQuestion = groupDailyQuestion;
         this.video = video;
     }
+
+    public boolean isReceivedBy(Long userId) {
+        return this.recipient.getId().equals(userId);
+    }
+
+    /** 이미 읽은 알림이면 readAt을 갱신하지 않는다(최초 읽은 시각 보존). */
+    public void markAsRead(LocalDateTime now) {
+        if (Boolean.TRUE.equals(this.isRead)) {
+            return;
+        }
+        this.isRead = true;
+        this.readAt = now;
+    }
 }
