@@ -81,7 +81,10 @@ public enum ErrorCode {
     COMMENT_BLANK(HttpStatus.BAD_REQUEST, "V006", "댓글 내용을 입력해주세요."),
     DAILY_QUESTION_NOT_ASSIGNED(HttpStatus.BAD_REQUEST, "V007", "오늘 배정된 질문이 없습니다."),
     QUESTION_MISMATCH(HttpStatus.BAD_REQUEST, "V008", "요청한 질문이 오늘 배정된 질문과 일치하지 않습니다."),
-    ALREADY_UPLOADED_TODAY(HttpStatus.CONFLICT, "V009", "오늘 이미 답변 영상을 업로드했습니다.");
+    ALREADY_UPLOADED_TODAY(HttpStatus.CONFLICT, "V009", "오늘 이미 답변 영상을 업로드했습니다."),
+    VIDEO_REQUIRED(HttpStatus.BAD_REQUEST, "V010", "업로드할 영상을 선택해주세요."),
+    UNSUPPORTED_VIDEO_TYPE(HttpStatus.BAD_REQUEST, "V011", "mp4, mov, webm 영상만 업로드할 수 있습니다."),
+    VIDEO_SIZE_EXCEEDED(HttpStatus.PAYLOAD_TOO_LARGE, "V012", "영상 파일 크기는 최대 10MB를 넘을 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;
