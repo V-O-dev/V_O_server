@@ -10,6 +10,7 @@ import com.example.v_o_server.domain.answer.entity.Video;
 import com.example.v_o_server.domain.answer.entity.VideoStatus;
 import com.example.v_o_server.domain.answer.repository.DailyAnswerRepository;
 import com.example.v_o_server.domain.answer.repository.VideoRepository;
+import com.example.v_o_server.domain.archive.service.ArchiveEntryWriter;
 import com.example.v_o_server.domain.group.entity.PrivateGroup;
 import com.example.v_o_server.domain.group.service.GroupAccessGuard;
 import com.example.v_o_server.domain.question.entity.GroupDailyQuestion;
@@ -36,6 +37,7 @@ public class VideoService {
     private final VideoRepository videoRepository;
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
+    private final ArchiveEntryWriter archiveEntryWriter;
 
     @Transactional
     public VideoResponse uploadVideo(Long userId, Long groupId, Long questionId, MultipartFile video) {
@@ -89,6 +91,9 @@ public class VideoService {
                 .capturedAt(now)
                 .uploadedAt(now)
                 .build());
+
+        // 같은 트랜잭션에서 나의 달력 기록을 만든다. 영상 저장 뒤라야 video_id FK를 채울 수 있다.
+        archiveEntryWriter.record(savedVideo, groupDailyQuestion, today);
 
         return toResponse(savedVideo);
     }

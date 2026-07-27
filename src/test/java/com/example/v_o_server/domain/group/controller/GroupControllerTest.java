@@ -20,7 +20,6 @@ import com.example.v_o_server.domain.group.dto.GroupNameDuplicateResponse;
 import com.example.v_o_server.domain.group.service.GroupInviteService;
 import com.example.v_o_server.domain.group.service.GroupMemberService;
 import com.example.v_o_server.domain.group.service.GroupService;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -160,17 +159,34 @@ class GroupControllerTest {
     }
 
     @Test
-    @DisplayName("multipart 생성 요청은 이미지와 함께 서비스로 전달된다")
+    @DisplayName("multipart(폼 필드) 생성 요청은 이미지와 함께 서비스로 전달된다")
     void createGroupWithImage() throws Exception {
-        MockMultipartFile request = new MockMultipartFile("request", null,
-                MediaType.APPLICATION_JSON_VALUE, createRequestJson("우리 가족").getBytes(StandardCharsets.UTF_8));
         MockMultipartFile image =
                 new MockMultipartFile("image", "a.png", MediaType.IMAGE_PNG_VALUE, new byte[]{1, 2, 3});
 
-        mockMvc.perform(multipart("/api/v1/groups").file(request).file(image).with(authUser()))
+        mockMvc.perform(multipart("/api/v1/groups")
+                        .file(image)
+                        .param("groupName", "우리 가족")
+                        .param("themeCode", "FAMILY")
+                        .param("notificationStartTime", "20:00")
+                        .param("notificationEndTime", "21:00")
+                        .with(authUser()))
                 .andExpect(status().isOk());
 
         verify(groupService).createGroup(eq(AUTH_USER_ID), any(), any(MultipartFile.class));
+    }
+
+    @Test
+    @DisplayName("multipart 폼 필드도 검증된다 — 그룹명 16자면 C001")
+    void createGroupWithImageValidatesFields() throws Exception {
+        mockMvc.perform(multipart("/api/v1/groups")
+                        .param("groupName", "가".repeat(16))
+                        .param("themeCode", "FAMILY")
+                        .param("notificationStartTime", "20:00")
+                        .param("notificationEndTime", "21:00")
+                        .with(authUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("C001"));
     }
 
     @Test
