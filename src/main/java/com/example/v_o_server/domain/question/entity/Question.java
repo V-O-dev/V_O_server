@@ -48,4 +48,9 @@ public class Question {
         this.answerTimeLimitMs = answerTimeLimitMs;
         this.useCount = useCount;
     }
+
+    public void use(LocalDateTime usedAt) {
+        this.useCount = this.useCount + 1;
+        this.lastUsedAt = usedAt;
+    }
 }

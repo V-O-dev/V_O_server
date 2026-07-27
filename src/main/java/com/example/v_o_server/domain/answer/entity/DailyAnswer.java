@@ -69,4 +69,13 @@ public class DailyAnswer {
         this.serviceDate = serviceDate;
         this.status = status;
     }
+
+    public boolean isUploaded() {
+        return status == AnswerUploadStatus.UPLOADED;
+    }
+
+    public void markUploaded(LocalDateTime uploadedAt) {
+        this.status = AnswerUploadStatus.UPLOADED;
+        this.uploadedAt = uploadedAt;
+    }
 }
