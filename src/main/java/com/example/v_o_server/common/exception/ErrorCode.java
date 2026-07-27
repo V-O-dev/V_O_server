@@ -7,7 +7,7 @@ import org.springframework.http.HttpStatus;
 /**
  * 애플리케이션 전역 에러 코드 정의.
  *
- * <p>code 접두사 규칙: C=공통, A=인증/인가, U=user, G=group.</p>
+ * <p>code 접두사 규칙: C=공통, A=인증/인가, U=user, V=영상/리액션/댓글, G=group, N=알림.</p>
  */
 @Getter
 @RequiredArgsConstructor
@@ -20,6 +20,7 @@ public enum ErrorCode {
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C004", "서버 내부 오류가 발생했습니다."),
     INVALID_TYPE_VALUE(HttpStatus.BAD_REQUEST, "C005", "요청 파라미터 타입이 올바르지 않습니다."),
     MISSING_REQUEST_PARAMETER(HttpStatus.BAD_REQUEST, "C006", "필수 요청 파라미터가 누락되었습니다."),
+    TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "C007", "요청이 너무 잦습니다. 잠시 후 다시 시도해주세요."),
 
     // 인증/인가
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "A001", "인증이 필요합니다."),
@@ -60,20 +61,30 @@ public enum ErrorCode {
     CANNOT_KICK_SELF(HttpStatus.BAD_REQUEST, "G010", "자기 자신을 강제 퇴장시킬 수 없습니다."),
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "G011", "그룹 멤버를 찾을 수 없습니다."),
     THEME_NOT_FOUND(HttpStatus.NOT_FOUND, "G012", "그룹 테마를 찾을 수 없습니다."),
-    INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "G013", "알림 시간 범위가 올바르지 않습니다."),
+    INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "G013", "알림 시간 범위가 올바르지 않습니다."), 
     GROUP_THEME_NOT_SET(HttpStatus.BAD_REQUEST, "G014", "그룹에 테마가 설정되어 있지 않습니다."),
+    
+  // 알림
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "N001", "알림을 찾을 수 없습니다."),
+    NOTIFICATION_NO_PERMISSION(HttpStatus.FORBIDDEN, "N002", "해당 알림에 접근할 권한이 없습니다."),
+
 
     // 질문
     NO_QUESTION_CANDIDATE(HttpStatus.NOT_FOUND, "Q001", "테마에 해당하는 추천 가능한 질문이 없습니다."),
 
-    // 영상
+    // 영상/리액션/댓글
     VIDEO_NOT_FOUND(HttpStatus.NOT_FOUND, "V001", "영상을 찾을 수 없습니다."),
-    DAILY_QUESTION_NOT_ASSIGNED(HttpStatus.BAD_REQUEST, "V002", "오늘 배정된 질문이 없습니다."),
-    QUESTION_MISMATCH(HttpStatus.BAD_REQUEST, "V003", "요청한 질문이 오늘 배정된 질문과 일치하지 않습니다."),
-    ALREADY_UPLOADED_TODAY(HttpStatus.CONFLICT, "V004", "오늘 이미 답변 영상을 업로드했습니다."),
-    VIDEO_REQUIRED(HttpStatus.BAD_REQUEST, "V005", "업로드할 영상을 선택해주세요."),
-    UNSUPPORTED_VIDEO_TYPE(HttpStatus.BAD_REQUEST, "V006", "mp4, mov, webm 영상만 업로드할 수 있습니다."),
-    VIDEO_SIZE_EXCEEDED(HttpStatus.PAYLOAD_TOO_LARGE, "V007", "영상 파일 크기는 최대 10MB를 넘을 수 없습니다.");
+    FEED_LOCKED(HttpStatus.FORBIDDEN, "V002", "오늘의 답변을 완료해야 확인할 수 있습니다."),
+    COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "V003", "댓글을 찾을 수 없습니다."),
+    COMMENT_NO_PERMISSION(HttpStatus.FORBIDDEN, "V004", "댓글 작성자만 수정/삭제할 수 있습니다."),
+    COMMENT_TOO_LONG(HttpStatus.BAD_REQUEST, "V005", "댓글은 최대 100자까지 입력 가능합니다."),
+    COMMENT_BLANK(HttpStatus.BAD_REQUEST, "V006", "댓글 내용을 입력해주세요."),
+    DAILY_QUESTION_NOT_ASSIGNED(HttpStatus.BAD_REQUEST, "V007", "오늘 배정된 질문이 없습니다."),
+    QUESTION_MISMATCH(HttpStatus.BAD_REQUEST, "V008", "요청한 질문이 오늘 배정된 질문과 일치하지 않습니다."),
+    ALREADY_UPLOADED_TODAY(HttpStatus.CONFLICT, "V009", "오늘 이미 답변 영상을 업로드했습니다."),
+    VIDEO_REQUIRED(HttpStatus.BAD_REQUEST, "V010", "업로드할 영상을 선택해주세요."),
+    UNSUPPORTED_VIDEO_TYPE(HttpStatus.BAD_REQUEST, "V011", "mp4, mov, webm 영상만 업로드할 수 있습니다."),
+    VIDEO_SIZE_EXCEEDED(HttpStatus.PAYLOAD_TOO_LARGE, "V012", "영상 파일 크기는 최대 10MB를 넘을 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;

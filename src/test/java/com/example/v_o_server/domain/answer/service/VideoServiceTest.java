@@ -122,7 +122,7 @@ class VideoServiceTest {
     }
 
     @Test
-    @DisplayName("빈 영상은 V005로 거부하고 도메인 조회를 하지 않는다")
+    @DisplayName("빈 영상은 V010으로 거부하고 도메인 조회를 하지 않는다")
     void rejectsEmptyVideo() {
         MultipartFile emptyVideo = videoFile("video/mp4", 0, true);
 
@@ -136,7 +136,7 @@ class VideoServiceTest {
     }
 
     @Test
-    @DisplayName("지원하지 않는 파일 형식은 V006으로 거부한다")
+    @DisplayName("지원하지 않는 파일 형식은 V011로 거부한다")
     void rejectsUnsupportedContentType() {
         MultipartFile textFile = videoFile("text/plain", 100, false);
 
@@ -150,7 +150,7 @@ class VideoServiceTest {
     }
 
     @Test
-    @DisplayName("10MB를 넘는 영상은 V007로 거부한다")
+    @DisplayName("10MB를 넘는 영상은 V012로 거부한다")
     void rejectsOversizedVideo() {
         MultipartFile oversizedVideo = videoFile("video/mp4", 10L * 1024 * 1024 + 1, false);
 
@@ -164,7 +164,7 @@ class VideoServiceTest {
     }
 
     @Test
-    @DisplayName("오늘 질문과 다른 질문 ID는 V003으로 거부한다")
+    @DisplayName("오늘 질문과 다른 질문 ID는 V008으로 거부한다")
     void rejectsMismatchedQuestion() {
         givenUploadContext();
         MultipartFile videoFile = videoFile("video/mp4", 1024, false);
@@ -183,7 +183,7 @@ class VideoServiceTest {
     }
 
     @Test
-    @DisplayName("오늘 이미 업로드한 답변이 있으면 V004로 거부한다")
+    @DisplayName("오늘 이미 업로드한 답변이 있으면 V009로 거부한다")
     void rejectsDuplicateUpload() {
         UploadContext context = givenUploadContext();
         DailyAnswer uploadedAnswer = DailyAnswer.builder()
