@@ -3,9 +3,11 @@ package com.example.v_o_server.domain.group.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -28,12 +30,14 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.web.multipart.MultipartFile;
 
 @WebMvcTest(controllers = GroupController.class,
         excludeFilters = @ComponentScan.Filter(
@@ -131,6 +135,70 @@ class GroupControllerTest {
 
         verify(groupMemberService).leaveGroup(AUTH_USER_ID, 100L);
         verify(groupMemberService).kickMember(AUTH_USER_ID, 100L, 11L);
+    }
+
+    @Test
+    @DisplayName("DELETE /groups/{id} 는 그룹 삭제로 라우팅된다")
+    void deleteGroupRoute() throws Exception {
+        mockMvc.perform(delete("/api/v1/groups/100").with(authUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(groupService).deleteGroup(AUTH_USER_ID, 100L);
+    }
+
+    @Test
+    @DisplayName("방장이 아닌 사용자의 그룹 삭제는 G004 NOT_GROUP_OWNER")
+    void deleteGroupRequiresOwner() throws Exception {
+        willThrow(new BusinessException(ErrorCode.NOT_GROUP_OWNER))
+                .given(groupService).deleteGroup(AUTH_USER_ID, 100L);
+
+        mockMvc.perform(delete("/api/v1/groups/100").with(authUser()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("G004"));
+    }
+
+    @Test
+    @DisplayName("multipart(폼 필드) 생성 요청은 이미지와 함께 서비스로 전달된다")
+    void createGroupWithImage() throws Exception {
+        MockMultipartFile image =
+                new MockMultipartFile("image", "a.png", MediaType.IMAGE_PNG_VALUE, new byte[]{1, 2, 3});
+
+        mockMvc.perform(multipart("/api/v1/groups")
+                        .file(image)
+                        .param("groupName", "우리 가족")
+                        .param("themeCode", "FAMILY")
+                        .param("notificationStartTime", "20:00")
+                        .param("notificationEndTime", "21:00")
+                        .with(authUser()))
+                .andExpect(status().isOk());
+
+        verify(groupService).createGroup(eq(AUTH_USER_ID), any(), any(MultipartFile.class));
+    }
+
+    @Test
+    @DisplayName("multipart 폼 필드도 검증된다 — 그룹명 16자면 C001")
+    void createGroupWithImageValidatesFields() throws Exception {
+        mockMvc.perform(multipart("/api/v1/groups")
+                        .param("groupName", "가".repeat(16))
+                        .param("themeCode", "FAMILY")
+                        .param("notificationStartTime", "20:00")
+                        .param("notificationEndTime", "21:00")
+                        .with(authUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("C001"));
+    }
+
+    @Test
+    @DisplayName("JSON 생성 요청은 이미지 없이 기존 경로로 동작한다")
+    void createGroupWithoutImage() throws Exception {
+        mockMvc.perform(post("/api/v1/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createRequestJson("우리 가족"))
+                        .with(authUser()))
+                .andExpect(status().isOk());
+
+        verify(groupService).createGroup(eq(AUTH_USER_ID), any());
     }
 
     @Test

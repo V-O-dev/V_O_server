@@ -20,6 +20,7 @@ import com.example.v_o_server.domain.answer.entity.Video;
 import com.example.v_o_server.domain.answer.entity.VideoStatus;
 import com.example.v_o_server.domain.answer.repository.DailyAnswerRepository;
 import com.example.v_o_server.domain.answer.repository.VideoRepository;
+import com.example.v_o_server.domain.archive.service.ArchiveEntryWriter;
 import com.example.v_o_server.domain.group.entity.GroupStatus;
 import com.example.v_o_server.domain.group.entity.PrivateGroup;
 import com.example.v_o_server.domain.group.service.GroupAccessGuard;
@@ -54,6 +55,7 @@ class VideoServiceTest {
     private VideoRepository videoRepository;
     private UserRepository userRepository;
     private FileStorageService fileStorageService;
+    private ArchiveEntryWriter archiveEntryWriter;
     private VideoService videoService;
 
     @BeforeEach
@@ -64,18 +66,20 @@ class VideoServiceTest {
         videoRepository = org.mockito.Mockito.mock(VideoRepository.class);
         userRepository = org.mockito.Mockito.mock(UserRepository.class);
         fileStorageService = org.mockito.Mockito.mock(FileStorageService.class);
+        archiveEntryWriter = org.mockito.Mockito.mock(ArchiveEntryWriter.class);
         videoService = new VideoService(
                 groupAccessGuard,
                 groupDailyQuestionRepository,
                 dailyAnswerRepository,
                 videoRepository,
                 userRepository,
-                fileStorageService
+                fileStorageService,
+                archiveEntryWriter
         );
     }
 
     @Test
-    @DisplayName("영상 업로드는 답변 상태와 영상 메타데이터를 함께 저장한다")
+    @DisplayName("영상 업로드는 답변 상태와 영상 메타데이터를 저장하고 아카이브 기록을 남긴다")
     void uploadsVideoAndMarksDailyAnswerUploaded() {
         UploadContext context = givenUploadContext();
         MultipartFile videoFile = videoFile("video/mp4", 1024, false);
@@ -119,6 +123,10 @@ class VideoServiceTest {
         assertThat(videoCaptor.getValue().getCapturedAt()).isEqualTo(metadata.capturedAt());
         assertThat(videoCaptor.getValue().getMimeType()).isEqualTo("video/mp4");
         assertThat(context.groupDailyQuestion().getQuestion()).isSameAs(context.question());
+
+        // 저장된 그 영상으로, 오늘 배정 질문·오늘 날짜로 아카이브 기록이 생성돼야 한다.
+        verify(archiveEntryWriter)
+                .record(eq(videoCaptor.getValue()), eq(context.groupDailyQuestion()), eq(LocalDate.now()));
     }
 
     @Test
@@ -132,7 +140,7 @@ class VideoServiceTest {
         );
 
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VIDEO_REQUIRED);
-        verifyNoInteractions(groupAccessGuard, fileStorageService, videoRepository);
+        verifyNoInteractions(groupAccessGuard, fileStorageService, videoRepository, archiveEntryWriter);
     }
 
     @Test
@@ -146,7 +154,7 @@ class VideoServiceTest {
         );
 
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.UNSUPPORTED_VIDEO_TYPE);
-        verifyNoInteractions(groupAccessGuard, fileStorageService, videoRepository);
+        verifyNoInteractions(groupAccessGuard, fileStorageService, videoRepository, archiveEntryWriter);
     }
 
     @Test
@@ -160,11 +168,33 @@ class VideoServiceTest {
         );
 
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VIDEO_SIZE_EXCEEDED);
-        verifyNoInteractions(groupAccessGuard, fileStorageService, videoRepository);
+        verifyNoInteractions(groupAccessGuard, fileStorageService, videoRepository, archiveEntryWriter);
     }
 
     @Test
-    @DisplayName("오늘 질문과 다른 질문 ID는 V008으로 거부한다")
+    @DisplayName("오늘 배정된 질문이 없으면 V007로 거부하고 기록하지 않는다")
+    void rejectsWhenNoDailyQuestionAssigned() {
+        UploadContext context = uploadContext();
+        given(groupAccessGuard.getActiveGroup(GROUP_ID)).willReturn(context.group());
+        given(groupDailyQuestionRepository.findByGroupIdAndServiceDate(GROUP_ID, LocalDate.now()))
+                .willReturn(Optional.empty());
+
+        BusinessException exception = catchThrowableOfType(
+                () -> videoService.uploadVideo(
+                        USER_ID,
+                        metadata(),
+                        videoFile("video/mp4", 1024, false)
+                ),
+                BusinessException.class
+        );
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.DAILY_QUESTION_NOT_ASSIGNED);
+        verifyNoInteractions(fileStorageService);
+        verify(archiveEntryWriter, never()).record(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("오늘 질문과 다른 질문 ID는 V008으로 거부하고 기록하지 않는다")
     void rejectsMismatchedQuestion() {
         givenUploadContext();
         MultipartFile videoFile = videoFile("video/mp4", 1024, false);
@@ -180,10 +210,11 @@ class VideoServiceTest {
 
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.QUESTION_MISMATCH);
         verifyNoInteractions(fileStorageService);
+        verify(archiveEntryWriter, never()).record(any(), any(), any());
     }
 
     @Test
-    @DisplayName("오늘 이미 업로드한 답변이 있으면 V009로 거부한다")
+    @DisplayName("오늘 이미 업로드한 답변이 있으면 V009로 거부하고 기록하지 않는다")
     void rejectsDuplicateUpload() {
         UploadContext context = givenUploadContext();
         DailyAnswer uploadedAnswer = DailyAnswer.builder()
@@ -208,10 +239,11 @@ class VideoServiceTest {
 
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.ALREADY_UPLOADED_TODAY);
         verifyNoInteractions(fileStorageService);
+        verify(archiveEntryWriter, never()).record(any(), any(), any());
     }
 
     @Test
-    @DisplayName("DB 저장 실패 시 먼저 저장한 영상 파일을 보상 삭제한다")
+    @DisplayName("DB 저장 실패 시 먼저 저장한 영상 파일을 보상 삭제하고 기록하지 않는다")
     void deletesStoredFileWhenDatabaseSaveFails() {
         givenUploadContext();
         MultipartFile videoFile = videoFile("video/mp4", 1024, false);
@@ -230,6 +262,7 @@ class VideoServiceTest {
 
         assertThat(exception).hasMessage("DB save failed");
         verify(fileStorageService).delete("videos/orphan.mp4");
+        verify(archiveEntryWriter, never()).record(any(), any(), any());
     }
 
     @Test

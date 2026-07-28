@@ -17,6 +17,7 @@ import com.example.v_o_server.domain.group.entity.GroupStatus;
 import com.example.v_o_server.domain.group.entity.GroupTheme;
 import com.example.v_o_server.domain.group.entity.MemberStatus;
 import com.example.v_o_server.domain.group.entity.PrivateGroup;
+import com.example.v_o_server.domain.group.repository.GroupInviteRepository;
 import com.example.v_o_server.domain.group.repository.GroupMemberRepository;
 import com.example.v_o_server.domain.group.repository.GroupThemeRepository;
 import com.example.v_o_server.domain.group.repository.PrivateGroupRepository;
@@ -42,14 +43,25 @@ public class GroupService {
 
     private final PrivateGroupRepository privateGroupRepository;
     private final GroupMemberRepository groupMemberRepository;
+    private final GroupInviteRepository groupInviteRepository;
     private final GroupThemeRepository groupThemeRepository;
     private final UserRepository userRepository;
     private final GroupAccessGuard accessGuard;
     private final FileStorageService fileStorageService;
 
-    /** G1 그룹 생성 — 생성자는 OWNER 멤버로 함께 등록된다. */
+    /** G1 그룹 생성 (이미지 없음) — JSON 요청 경로. */
     @Transactional
     public GroupCreateResponse createGroup(Long userId, GroupCreateRequest request) {
+        return createGroup(userId, request, null);
+    }
+
+    /**
+     * G1 그룹 생성 — 생성자는 OWNER 멤버로 함께 등록된다.
+     *
+     * <p>대표 이미지는 선택이다. 없으면 생성 후 그룹 수정 API로 언제든 등록할 수 있다.</p>
+     */
+    @Transactional
+    public GroupCreateResponse createGroup(Long userId, GroupCreateRequest request, MultipartFile image) {
         validateTimeRange(request.notificationStartTime(), request.notificationEndTime());
 
         if (groupMemberRepository.existsActiveGroupNameForUser(userId, request.groupName(), null)) {
@@ -60,10 +72,17 @@ public class GroupService {
         GroupTheme theme = groupThemeRepository.findByCode(request.themeCode())
                 .orElseThrow(() -> new BusinessException(ErrorCode.THEME_NOT_FOUND));
 
+        // 검증을 모두 통과한 뒤에 저장한다 — 실패한 요청의 이미지가 스토리지에 남지 않도록.
+        StoredFile stored = (image != null && !image.isEmpty())
+                ? fileStorageService.upload(image, GROUP_IMAGE_DIR)
+                : new StoredFile(null, null);
+
         PrivateGroup group = privateGroupRepository.save(PrivateGroup.builder()
                 .owner(owner)
                 .theme(theme)
                 .name(request.groupName())
+                .groupImageUrl(stored.url())
+                .groupImageObjectKey(stored.objectKey())
                 .notificationStartTime(request.notificationStartTime())
                 .notificationEndTime(request.notificationEndTime())
                 .timezone(DEFAULT_TIMEZONE)
@@ -122,9 +141,10 @@ public class GroupService {
     public GroupDetailResponse updateGroup(Long userId, Long groupId, GroupUpdateRequest request,
                                            MultipartFile image) {
         boolean hasName = request != null && request.groupName() != null && !request.groupName().isBlank();
+        boolean hasTheme = request != null && request.themeCode() != null && !request.themeCode().isBlank();
         boolean hasImage = image != null && !image.isEmpty();
-        if (!hasName && !hasImage) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "수정할 그룹명 또는 이미지가 필요합니다.");
+        if (!hasName && !hasTheme && !hasImage) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "수정할 그룹명, 테마 또는 이미지가 필요합니다.");
         }
 
         PrivateGroup group = accessGuard.getActiveGroup(groupId);
@@ -136,6 +156,12 @@ public class GroupService {
                 throw new BusinessException(ErrorCode.GROUP_NAME_DUPLICATED);
             }
             group.updateName(request.groupName());
+        }
+        // 테마 조회를 이미지 업로드보다 먼저 처리해, 잘못된 테마코드면 이미지가 스토리지에 남지 않게 한다.
+        if (hasTheme) {
+            GroupTheme theme = groupThemeRepository.findByCode(request.themeCode())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.THEME_NOT_FOUND));
+            group.updateTheme(theme);
         }
         if (hasImage) {
             StoredFile stored = fileStorageService.upload(image, GROUP_IMAGE_DIR);
@@ -149,15 +175,46 @@ public class GroupService {
         return GroupDetailResponse.of(group, members);
     }
 
+    /**
+     * G12 그룹 삭제 — 방장만 가능.
+     *
+     * <p>그룹을 소프트 삭제하고, 남아 있던 멤버 전원을 함께 내보내며, 살아 있는 초대 코드를 모두 무효화한다.
+     * 세 작업은 한 트랜잭션이라 "그룹은 지워졌는데 멤버는 남아 있는" 중간 상태가 생기지 않는다.</p>
+     *
+     * <p>가입 처리와 동일한 비관적 쓰기 락으로 그룹을 잡아, 삭제 도중 새 멤버가 들어오는 경쟁을 막는다.</p>
+     */
+    @Transactional
+    public void deleteGroup(Long userId, Long groupId) {
+        PrivateGroup group = privateGroupRepository.findByIdAndStatusForUpdate(groupId, GroupStatus.ACTIVE)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+        accessGuard.assertOwner(groupId, userId);
+
+        LocalDateTime now = LocalDateTime.now();
+        // 벌크 연산은 영속성 컨텍스트를 flush 후 clear 하므로, 그룹 상태 변경을 먼저 적용해 함께 flush 되게 한다.
+        group.softDelete(now);
+        // 강제 퇴장이 아니므로 LEFT — 재가입 차단(블랙리스트) 대상이 되면 안 된다.
+        groupMemberRepository.leaveAllActiveMembers(groupId, now);
+        groupInviteRepository.revokeAllActiveInvites(groupId);
+    }
+
     private User getUser(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
     }
 
+    /**
+     * 질문 발송 시간대 검증.
+     *
+     * <p>자정 넘김(예: 20:00~10:00)을 허용한다 — 종료가 시작보다 앞서면 다음 날로 이어지는 구간으로 해석한다.
+     * 시작==종료만 거부한다(0분/24시간이 모호하기 때문).</p>
+     *
+     * <p><b>주의:</b> 기능명세서 2.3.1은 "종료가 시작보다 앞서면 경고"라 자정 넘김을 금지하지만,
+     * 사용자 결정(야간대 사용성·Figma 예시 {@code 20:00~10:00})으로 자정 넘김을 허용하도록 이탈했다.</p>
+     */
     private void validateTimeRange(java.time.LocalTime start, java.time.LocalTime end) {
-        if (!start.isBefore(end)) {
+        if (start.equals(end)) {
             throw new BusinessException(ErrorCode.INVALID_TIME_RANGE,
-                    "알림 시작 시간은 종료 시간보다 앞서야 합니다.");
+                    "알림 시작 시간과 종료 시간은 같을 수 없습니다.");
         }
     }
 }

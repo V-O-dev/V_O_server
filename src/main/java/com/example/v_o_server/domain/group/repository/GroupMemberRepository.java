@@ -2,9 +2,11 @@ package com.example.v_o_server.domain.group.repository;
 
 import com.example.v_o_server.domain.group.entity.GroupMember;
 import com.example.v_o_server.domain.group.entity.MemberStatus;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -30,6 +32,38 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
               and g.status = com.example.v_o_server.domain.group.entity.GroupStatus.ACTIVE
             """)
     List<GroupMember> findActiveMembershipsWithGroup(@Param("userId") Long userId);
+
+    /**
+     * 현재 사용자가 ACTIVE 멤버인 그룹의 id 목록 (그룹도 ACTIVE인 것만).
+     *
+     * <p>아카이브 조회 범위를 "내가 지금 속한 그룹"으로 제한하는 데 쓴다.
+     * 탈퇴(LEFT)·강제 퇴장(KICKED)한 그룹은 여기서 빠지므로, 그 그룹의 과거 기록은 달력에서 보이지 않는다.</p>
+     */
+    @Query("""
+            select m.group.id from GroupMember m
+            where m.user.id = :userId
+              and m.status = com.example.v_o_server.domain.group.entity.MemberStatus.ACTIVE
+              and m.group.status = com.example.v_o_server.domain.group.entity.GroupStatus.ACTIVE
+            """)
+    List<Long> findActiveGroupIds(@Param("userId") Long userId);
+
+    /**
+     * 그룹 삭제 시 남아 있는 ACTIVE 멤버를 전부 LEFT로 정리한다.
+     *
+     * <p>강제 퇴장이 아니므로 KICKED가 아닌 LEFT를 쓴다(재가입 차단 대상이 되면 안 된다).
+     * 멤버 수가 최대 15명이라 벌크 업데이트 한 번이면 충분하다.</p>
+     *
+     * @return 정리된 멤버 수
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update GroupMember m
+               set m.status = com.example.v_o_server.domain.group.entity.MemberStatus.LEFT,
+                   m.leftAt = :leftAt
+             where m.group.id = :groupId
+               and m.status = com.example.v_o_server.domain.group.entity.MemberStatus.ACTIVE
+            """)
+    int leaveAllActiveMembers(@Param("groupId") Long groupId, @Param("leftAt") LocalDateTime leftAt);
 
     /** 그룹명 중복 확인 — 현재 사용자의 ACTIVE 그룹 중 동일 이름 존재 여부 (excludeGroupId는 제외). */
     @Query("""

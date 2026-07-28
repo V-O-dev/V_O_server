@@ -21,13 +21,16 @@ import com.example.v_o_server.domain.group.dto.GroupCreateResponse;
 import com.example.v_o_server.domain.group.dto.GroupUpdateRequest;
 import com.example.v_o_server.domain.group.entity.GroupMember;
 import com.example.v_o_server.domain.group.entity.GroupMemberRole;
+import com.example.v_o_server.domain.group.entity.GroupStatus;
 import com.example.v_o_server.domain.group.entity.MemberStatus;
 import com.example.v_o_server.domain.group.entity.PrivateGroup;
+import com.example.v_o_server.domain.group.repository.GroupInviteRepository;
 import com.example.v_o_server.domain.group.repository.GroupMemberRepository;
 import com.example.v_o_server.domain.group.repository.GroupThemeRepository;
 import com.example.v_o_server.domain.group.repository.PrivateGroupRepository;
 import com.example.v_o_server.domain.user.entity.User;
 import com.example.v_o_server.domain.user.repository.UserRepository;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
@@ -35,6 +38,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -51,6 +55,8 @@ class GroupServiceTest {
     private PrivateGroupRepository privateGroupRepository;
     @Mock
     private GroupMemberRepository groupMemberRepository;
+    @Mock
+    private GroupInviteRepository groupInviteRepository;
     @Mock
     private GroupThemeRepository groupThemeRepository;
     @Mock
@@ -94,6 +100,48 @@ class GroupServiceTest {
         }
 
         @Test
+        @DisplayName("이미지를 함께 보내면 저장 결과를 그룹에 반영한다")
+        void storesImageOnCreate() {
+            User owner = user(USER_ID);
+            PrivateGroup group = group(GROUP_ID, owner, 15);
+            MockMultipartFile image =
+                    new MockMultipartFile("image", "a.png", "image/png", new byte[]{1, 2, 3});
+
+            given(groupMemberRepository.existsActiveGroupNameForUser(eq(USER_ID), eq("우리 가족"), isNull()))
+                    .willReturn(false);
+            given(userRepository.findById(USER_ID)).willReturn(Optional.of(owner));
+            given(groupThemeRepository.findByCode("FAMILY")).willReturn(Optional.of(theme(1L, "FAMILY")));
+            given(fileStorageService.upload(eq(image), any()))
+                    .willReturn(new FileStorageService.StoredFile("https://cdn/a.png", "key/a.png"));
+            given(privateGroupRepository.save(any(PrivateGroup.class))).willReturn(group);
+            given(groupMemberRepository.save(any(GroupMember.class)))
+                    .willReturn(member(1L, group, owner, GroupMemberRole.OWNER, MemberStatus.ACTIVE));
+
+            groupService.createGroup(USER_ID, createRequest("우리 가족", LocalTime.of(20, 0), LocalTime.of(21, 0)),
+                    image);
+
+            ArgumentCaptor<PrivateGroup> saved = ArgumentCaptor.forClass(PrivateGroup.class);
+            verify(privateGroupRepository).save(saved.capture());
+            assertThat(saved.getValue().getGroupImageUrl()).isEqualTo("https://cdn/a.png");
+            assertThat(saved.getValue().getGroupImageObjectKey()).isEqualTo("key/a.png");
+        }
+
+        @Test
+        @DisplayName("검증에 실패하면 이미지를 저장하지 않는다")
+        void skipsImageStoreWhenValidationFails() {
+            MockMultipartFile image =
+                    new MockMultipartFile("image", "a.png", "image/png", new byte[]{1, 2, 3});
+            given(groupMemberRepository.existsActiveGroupNameForUser(eq(USER_ID), eq("우리 가족"), isNull()))
+                    .willReturn(true);
+
+            assertThatThrownBy(() -> groupService.createGroup(
+                    USER_ID, createRequest("우리 가족", LocalTime.of(20, 0), LocalTime.of(21, 0)), image))
+                    .isInstanceOf(BusinessException.class);
+
+            verify(fileStorageService, never()).upload(any(), any());
+        }
+
+        @Test
         @DisplayName("같은 사용자의 활동 그룹에 동일 이름이 있으면 GROUP_NAME_DUPLICATED")
         void rejectsDuplicateName() {
             given(groupMemberRepository.existsActiveGroupNameForUser(eq(USER_ID), eq("우리 가족"), isNull()))
@@ -121,14 +169,36 @@ class GroupServiceTest {
         }
 
         @Test
-        @DisplayName("시작 시간이 종료 시간보다 늦으면 INVALID_TIME_RANGE")
-        void rejectsInvalidTimeRange() {
+        @DisplayName("시작과 종료 시간이 같으면 INVALID_TIME_RANGE")
+        void rejectsEqualTimeRange() {
             assertThatThrownBy(() -> groupService.createGroup(
-                    USER_ID, createRequest("우리 가족", LocalTime.of(22, 0), LocalTime.of(21, 0))))
+                    USER_ID, createRequest("우리 가족", LocalTime.of(21, 0), LocalTime.of(21, 0))))
                     .isInstanceOf(BusinessException.class)
                     .extracting("errorCode").isEqualTo(ErrorCode.INVALID_TIME_RANGE);
 
             verify(privateGroupRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("자정을 넘기는 시간대(종료<시작)도 허용한다")
+        void allowsOvernightTimeRange() {
+            User owner = user(USER_ID);
+            PrivateGroup group = group(GROUP_ID, owner, 15);
+
+            given(groupMemberRepository.existsActiveGroupNameForUser(eq(USER_ID), eq("우리 가족"), isNull()))
+                    .willReturn(false);
+            given(userRepository.findById(USER_ID)).willReturn(Optional.of(owner));
+            given(groupThemeRepository.findByCode("FAMILY")).willReturn(Optional.of(theme(1L, "FAMILY")));
+            given(privateGroupRepository.save(any(PrivateGroup.class))).willReturn(group);
+            given(groupMemberRepository.save(any(GroupMember.class)))
+                    .willReturn(member(1L, group, owner, GroupMemberRole.OWNER, MemberStatus.ACTIVE));
+
+            // 20:00 부터 다음 날 10:00 까지 — 자정 넘김
+            GroupCreateResponse response = groupService.createGroup(
+                    USER_ID, createRequest("우리 가족", LocalTime.of(20, 0), LocalTime.of(10, 0)));
+
+            assertThat(response.groupId()).isEqualTo(GROUP_ID);
+            verify(privateGroupRepository).save(any(PrivateGroup.class));
         }
     }
 
@@ -137,10 +207,10 @@ class GroupServiceTest {
     class UpdateGroup {
 
         @Test
-        @DisplayName("그룹명과 이미지가 모두 없으면 INVALID_INPUT_VALUE")
+        @DisplayName("그룹명·테마·이미지가 모두 없으면 INVALID_INPUT_VALUE")
         void rejectsEmptyUpdate() {
             assertThatThrownBy(() ->
-                    groupService.updateGroup(USER_ID, GROUP_ID, new GroupUpdateRequest(null), null))
+                    groupService.updateGroup(USER_ID, GROUP_ID, new GroupUpdateRequest(null, null), null))
                     .isInstanceOf(BusinessException.class)
                     .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
         }
@@ -157,7 +227,7 @@ class GroupServiceTest {
             given(groupMemberRepository.findByGroupIdAndStatus(GROUP_ID, MemberStatus.ACTIVE))
                     .willReturn(List.of(member(1L, group, owner, GroupMemberRole.OWNER, MemberStatus.ACTIVE)));
 
-            groupService.updateGroup(USER_ID, GROUP_ID, new GroupUpdateRequest("새 이름"), null);
+            groupService.updateGroup(USER_ID, GROUP_ID, new GroupUpdateRequest("새 이름", null), null);
 
             assertThat(group.getName()).isEqualTo("새 이름");
             verify(groupMemberRepository).existsActiveGroupNameForUser(USER_ID, "새 이름", GROUP_ID);
@@ -177,11 +247,104 @@ class GroupServiceTest {
             given(groupMemberRepository.findByGroupIdAndStatus(GROUP_ID, MemberStatus.ACTIVE))
                     .willReturn(List.of(member(1L, group, owner, GroupMemberRole.OWNER, MemberStatus.ACTIVE)));
 
-            groupService.updateGroup(USER_ID, GROUP_ID, new GroupUpdateRequest(null), image);
+            groupService.updateGroup(USER_ID, GROUP_ID, new GroupUpdateRequest(null, null), image);
 
             assertThat(group.getName()).isEqualTo("테스트 그룹");
             assertThat(group.getGroupImageUrl()).isEqualTo("https://cdn/a.png");
             assertThat(group.getGroupImageObjectKey()).isEqualTo("key/a.png");
+        }
+
+        @Test
+        @DisplayName("테마 코드만 보내면 그룹 테마를 변경한다")
+        void updatesThemeOnly() {
+            User owner = user(USER_ID);
+            PrivateGroup group = group(GROUP_ID, owner, 15);
+
+            given(accessGuard.getActiveGroup(GROUP_ID)).willReturn(group);
+            given(groupThemeRepository.findByCode("COUPLE"))
+                    .willReturn(Optional.of(theme(2L, "COUPLE")));
+            given(groupMemberRepository.findByGroupIdAndStatus(GROUP_ID, MemberStatus.ACTIVE))
+                    .willReturn(List.of(member(1L, group, owner, GroupMemberRole.OWNER, MemberStatus.ACTIVE)));
+
+            groupService.updateGroup(USER_ID, GROUP_ID, new GroupUpdateRequest(null, "COUPLE"), null);
+
+            assertThat(group.getTheme().getCode()).isEqualTo("COUPLE");
+            assertThat(group.getName()).isEqualTo("테스트 그룹");
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 테마 코드면 THEME_NOT_FOUND, 이미지는 저장하지 않는다")
+        void rejectsUnknownThemeAndSkipsImage() {
+            User owner = user(USER_ID);
+            PrivateGroup group = group(GROUP_ID, owner, 15);
+            MockMultipartFile image =
+                    new MockMultipartFile("image", "a.png", "image/png", new byte[]{1, 2, 3});
+
+            given(accessGuard.getActiveGroup(GROUP_ID)).willReturn(group);
+            given(groupThemeRepository.findByCode("NOPE")).willReturn(Optional.empty());
+
+            assertThatThrownBy(() -> groupService.updateGroup(
+                    USER_ID, GROUP_ID, new GroupUpdateRequest(null, "NOPE"), image))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode").isEqualTo(ErrorCode.THEME_NOT_FOUND);
+
+            verify(fileStorageService, never()).upload(any(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("그룹 삭제")
+    class DeleteGroup {
+
+        @Test
+        @DisplayName("방장이 삭제하면 그룹은 DELETED, 남은 멤버는 전원 정리되고 초대도 무효화된다")
+        void deletesGroupWithMembersAndInvites() {
+            User owner = user(USER_ID);
+            PrivateGroup group = group(GROUP_ID, owner, 15);
+
+            given(privateGroupRepository.findByIdAndStatusForUpdate(GROUP_ID, GroupStatus.ACTIVE))
+                    .willReturn(Optional.of(group));
+            given(accessGuard.assertOwner(GROUP_ID, USER_ID))
+                    .willReturn(member(1L, group, owner, GroupMemberRole.OWNER, MemberStatus.ACTIVE));
+
+            groupService.deleteGroup(USER_ID, GROUP_ID);
+
+            assertThat(group.getStatus()).isEqualTo(GroupStatus.DELETED);
+            assertThat(group.getDeletedAt()).isNotNull();
+            // 강제 퇴장이 아니라 LEFT로 정리해야 재가입 차단 대상이 되지 않는다.
+            verify(groupMemberRepository).leaveAllActiveMembers(eq(GROUP_ID), any(LocalDateTime.class));
+            verify(groupInviteRepository).revokeAllActiveInvites(GROUP_ID);
+        }
+
+        @Test
+        @DisplayName("방장이 아니면 NOT_GROUP_OWNER — 아무것도 지우지 않는다")
+        void rejectsNonOwner() {
+            User owner = user(USER_ID);
+            PrivateGroup group = group(GROUP_ID, owner, 15);
+
+            given(privateGroupRepository.findByIdAndStatusForUpdate(GROUP_ID, GroupStatus.ACTIVE))
+                    .willReturn(Optional.of(group));
+            given(accessGuard.assertOwner(GROUP_ID, USER_ID))
+                    .willThrow(new BusinessException(ErrorCode.NOT_GROUP_OWNER));
+
+            assertThatThrownBy(() -> groupService.deleteGroup(USER_ID, GROUP_ID))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode").isEqualTo(ErrorCode.NOT_GROUP_OWNER);
+
+            assertThat(group.getStatus()).isEqualTo(GroupStatus.ACTIVE);
+            verify(groupMemberRepository, never()).leaveAllActiveMembers(any(), any());
+            verify(groupInviteRepository, never()).revokeAllActiveInvites(any());
+        }
+
+        @Test
+        @DisplayName("이미 삭제됐거나 없는 그룹이면 GROUP_NOT_FOUND")
+        void rejectsMissingGroup() {
+            given(privateGroupRepository.findByIdAndStatusForUpdate(GROUP_ID, GroupStatus.ACTIVE))
+                    .willReturn(Optional.empty());
+
+            assertThatThrownBy(() -> groupService.deleteGroup(USER_ID, GROUP_ID))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode").isEqualTo(ErrorCode.GROUP_NOT_FOUND);
         }
     }
 }
