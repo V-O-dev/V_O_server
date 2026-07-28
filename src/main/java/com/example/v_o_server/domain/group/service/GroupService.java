@@ -141,9 +141,10 @@ public class GroupService {
     public GroupDetailResponse updateGroup(Long userId, Long groupId, GroupUpdateRequest request,
                                            MultipartFile image) {
         boolean hasName = request != null && request.groupName() != null && !request.groupName().isBlank();
+        boolean hasTheme = request != null && request.themeCode() != null && !request.themeCode().isBlank();
         boolean hasImage = image != null && !image.isEmpty();
-        if (!hasName && !hasImage) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "수정할 그룹명 또는 이미지가 필요합니다.");
+        if (!hasName && !hasTheme && !hasImage) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "수정할 그룹명, 테마 또는 이미지가 필요합니다.");
         }
 
         PrivateGroup group = accessGuard.getActiveGroup(groupId);
@@ -155,6 +156,12 @@ public class GroupService {
                 throw new BusinessException(ErrorCode.GROUP_NAME_DUPLICATED);
             }
             group.updateName(request.groupName());
+        }
+        // 테마 조회를 이미지 업로드보다 먼저 처리해, 잘못된 테마코드면 이미지가 스토리지에 남지 않게 한다.
+        if (hasTheme) {
+            GroupTheme theme = groupThemeRepository.findByCode(request.themeCode())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.THEME_NOT_FOUND));
+            group.updateTheme(theme);
         }
         if (hasImage) {
             StoredFile stored = fileStorageService.upload(image, GROUP_IMAGE_DIR);
@@ -195,10 +202,19 @@ public class GroupService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
     }
 
+    /**
+     * 질문 발송 시간대 검증.
+     *
+     * <p>자정 넘김(예: 20:00~10:00)을 허용한다 — 종료가 시작보다 앞서면 다음 날로 이어지는 구간으로 해석한다.
+     * 시작==종료만 거부한다(0분/24시간이 모호하기 때문).</p>
+     *
+     * <p><b>주의:</b> 기능명세서 2.3.1은 "종료가 시작보다 앞서면 경고"라 자정 넘김을 금지하지만,
+     * 사용자 결정(야간대 사용성·Figma 예시 {@code 20:00~10:00})으로 자정 넘김을 허용하도록 이탈했다.</p>
+     */
     private void validateTimeRange(java.time.LocalTime start, java.time.LocalTime end) {
-        if (!start.isBefore(end)) {
+        if (start.equals(end)) {
             throw new BusinessException(ErrorCode.INVALID_TIME_RANGE,
-                    "알림 시작 시간은 종료 시간보다 앞서야 합니다.");
+                    "알림 시작 시간과 종료 시간은 같을 수 없습니다.");
         }
     }
 }

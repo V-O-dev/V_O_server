@@ -169,14 +169,36 @@ class GroupServiceTest {
         }
 
         @Test
-        @DisplayName("시작 시간이 종료 시간보다 늦으면 INVALID_TIME_RANGE")
-        void rejectsInvalidTimeRange() {
+        @DisplayName("시작과 종료 시간이 같으면 INVALID_TIME_RANGE")
+        void rejectsEqualTimeRange() {
             assertThatThrownBy(() -> groupService.createGroup(
-                    USER_ID, createRequest("우리 가족", LocalTime.of(22, 0), LocalTime.of(21, 0))))
+                    USER_ID, createRequest("우리 가족", LocalTime.of(21, 0), LocalTime.of(21, 0))))
                     .isInstanceOf(BusinessException.class)
                     .extracting("errorCode").isEqualTo(ErrorCode.INVALID_TIME_RANGE);
 
             verify(privateGroupRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("자정을 넘기는 시간대(종료<시작)도 허용한다")
+        void allowsOvernightTimeRange() {
+            User owner = user(USER_ID);
+            PrivateGroup group = group(GROUP_ID, owner, 15);
+
+            given(groupMemberRepository.existsActiveGroupNameForUser(eq(USER_ID), eq("우리 가족"), isNull()))
+                    .willReturn(false);
+            given(userRepository.findById(USER_ID)).willReturn(Optional.of(owner));
+            given(groupThemeRepository.findByCode("FAMILY")).willReturn(Optional.of(theme(1L, "FAMILY")));
+            given(privateGroupRepository.save(any(PrivateGroup.class))).willReturn(group);
+            given(groupMemberRepository.save(any(GroupMember.class)))
+                    .willReturn(member(1L, group, owner, GroupMemberRole.OWNER, MemberStatus.ACTIVE));
+
+            // 20:00 부터 다음 날 10:00 까지 — 자정 넘김
+            GroupCreateResponse response = groupService.createGroup(
+                    USER_ID, createRequest("우리 가족", LocalTime.of(20, 0), LocalTime.of(10, 0)));
+
+            assertThat(response.groupId()).isEqualTo(GROUP_ID);
+            verify(privateGroupRepository).save(any(PrivateGroup.class));
         }
     }
 
@@ -185,10 +207,10 @@ class GroupServiceTest {
     class UpdateGroup {
 
         @Test
-        @DisplayName("그룹명과 이미지가 모두 없으면 INVALID_INPUT_VALUE")
+        @DisplayName("그룹명·테마·이미지가 모두 없으면 INVALID_INPUT_VALUE")
         void rejectsEmptyUpdate() {
             assertThatThrownBy(() ->
-                    groupService.updateGroup(USER_ID, GROUP_ID, new GroupUpdateRequest(null), null))
+                    groupService.updateGroup(USER_ID, GROUP_ID, new GroupUpdateRequest(null, null), null))
                     .isInstanceOf(BusinessException.class)
                     .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
         }
@@ -205,7 +227,7 @@ class GroupServiceTest {
             given(groupMemberRepository.findByGroupIdAndStatus(GROUP_ID, MemberStatus.ACTIVE))
                     .willReturn(List.of(member(1L, group, owner, GroupMemberRole.OWNER, MemberStatus.ACTIVE)));
 
-            groupService.updateGroup(USER_ID, GROUP_ID, new GroupUpdateRequest("새 이름"), null);
+            groupService.updateGroup(USER_ID, GROUP_ID, new GroupUpdateRequest("새 이름", null), null);
 
             assertThat(group.getName()).isEqualTo("새 이름");
             verify(groupMemberRepository).existsActiveGroupNameForUser(USER_ID, "새 이름", GROUP_ID);
@@ -225,11 +247,48 @@ class GroupServiceTest {
             given(groupMemberRepository.findByGroupIdAndStatus(GROUP_ID, MemberStatus.ACTIVE))
                     .willReturn(List.of(member(1L, group, owner, GroupMemberRole.OWNER, MemberStatus.ACTIVE)));
 
-            groupService.updateGroup(USER_ID, GROUP_ID, new GroupUpdateRequest(null), image);
+            groupService.updateGroup(USER_ID, GROUP_ID, new GroupUpdateRequest(null, null), image);
 
             assertThat(group.getName()).isEqualTo("테스트 그룹");
             assertThat(group.getGroupImageUrl()).isEqualTo("https://cdn/a.png");
             assertThat(group.getGroupImageObjectKey()).isEqualTo("key/a.png");
+        }
+
+        @Test
+        @DisplayName("테마 코드만 보내면 그룹 테마를 변경한다")
+        void updatesThemeOnly() {
+            User owner = user(USER_ID);
+            PrivateGroup group = group(GROUP_ID, owner, 15);
+
+            given(accessGuard.getActiveGroup(GROUP_ID)).willReturn(group);
+            given(groupThemeRepository.findByCode("COUPLE"))
+                    .willReturn(Optional.of(theme(2L, "COUPLE")));
+            given(groupMemberRepository.findByGroupIdAndStatus(GROUP_ID, MemberStatus.ACTIVE))
+                    .willReturn(List.of(member(1L, group, owner, GroupMemberRole.OWNER, MemberStatus.ACTIVE)));
+
+            groupService.updateGroup(USER_ID, GROUP_ID, new GroupUpdateRequest(null, "COUPLE"), null);
+
+            assertThat(group.getTheme().getCode()).isEqualTo("COUPLE");
+            assertThat(group.getName()).isEqualTo("테스트 그룹");
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 테마 코드면 THEME_NOT_FOUND, 이미지는 저장하지 않는다")
+        void rejectsUnknownThemeAndSkipsImage() {
+            User owner = user(USER_ID);
+            PrivateGroup group = group(GROUP_ID, owner, 15);
+            MockMultipartFile image =
+                    new MockMultipartFile("image", "a.png", "image/png", new byte[]{1, 2, 3});
+
+            given(accessGuard.getActiveGroup(GROUP_ID)).willReturn(group);
+            given(groupThemeRepository.findByCode("NOPE")).willReturn(Optional.empty());
+
+            assertThatThrownBy(() -> groupService.updateGroup(
+                    USER_ID, GROUP_ID, new GroupUpdateRequest(null, "NOPE"), image))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode").isEqualTo(ErrorCode.THEME_NOT_FOUND);
+
+            verify(fileStorageService, never()).upload(any(), any());
         }
     }
 

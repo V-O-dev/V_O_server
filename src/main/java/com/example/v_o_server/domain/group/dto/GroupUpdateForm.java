@@ -17,10 +17,13 @@ public record GroupUpdateForm(
         @Pattern(regexp = "^[가-힣a-zA-Z0-9 ]+$", message = "그룹명에 특수문자는 사용할 수 없습니다.")
         String groupName,
 
+        @Schema(description = "변경할 테마 코드 (선택)", example = "COUPLE")
+        String themeCode,
+
         @Schema(description = "변경할 대표 이미지 (선택)", type = "string", format = "binary")
         MultipartFile image
 ) {
     public GroupUpdateRequest toRequest() {
-        return new GroupUpdateRequest(groupName);
+        return new GroupUpdateRequest(groupName, themeCode);
     }
 }

@@ -87,7 +87,8 @@ public class GroupController {
     }
 
     @Operation(summary = "그룹 정보 수정",
-            description = "그룹명 또는 이미지를 수정합니다. 그룹명은 폼 필드, 이미지는 선택 파일 파트로 보냅니다. 최소 한 개는 필요합니다.")
+            description = "그룹명·테마·이미지를 수정합니다. 그룹명·테마코드는 폼 필드, 이미지는 선택 파일 파트로 보냅니다. "
+                    + "세 가지 중 최소 한 개는 필요합니다.")
     @PatchMapping(value = "/{groupId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<GroupDetailResponse> updateGroup(
             @AuthenticationPrincipal Long userId,

@@ -96,6 +96,10 @@ public class PrivateGroup extends BaseTimeEntity {
         this.groupImageObjectKey = groupImageObjectKey;
     }
 
+    public void updateTheme(GroupTheme theme) {
+        this.theme = theme;
+    }
+
     public void changeOwner(User newOwner) {
         this.owner = newOwner;
     }
