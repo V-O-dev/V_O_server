@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -15,7 +16,7 @@ import com.example.v_o_server.common.exception.ErrorCode;
 import com.example.v_o_server.domain.group.entity.GroupStatus;
 import com.example.v_o_server.domain.group.entity.GroupTheme;
 import com.example.v_o_server.domain.group.entity.PrivateGroup;
-import com.example.v_o_server.domain.group.repository.PrivateGroupRepository;
+import com.example.v_o_server.domain.group.service.GroupAccessGuard;
 import com.example.v_o_server.domain.question.dto.response.DailyQuestionResponse;
 import com.example.v_o_server.domain.question.entity.AssignmentStatus;
 import com.example.v_o_server.domain.question.entity.GroupDailyQuestion;
@@ -34,17 +35,19 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 class QuestionServiceTest {
 
-    private PrivateGroupRepository privateGroupRepository;
+    private static final Long USER_ID = 7L;
+
+    private GroupAccessGuard groupAccessGuard;
     private QuestionRepository questionRepository;
     private GroupDailyQuestionRepository groupDailyQuestionRepository;
     private QuestionService questionService;
 
     @BeforeEach
     void setUp() {
-        privateGroupRepository = mock(PrivateGroupRepository.class);
+        groupAccessGuard = mock(GroupAccessGuard.class);
         questionRepository = mock(QuestionRepository.class);
         groupDailyQuestionRepository = mock(GroupDailyQuestionRepository.class);
-        questionService = new QuestionService(privateGroupRepository, questionRepository, groupDailyQuestionRepository);
+        questionService = new QuestionService(groupAccessGuard, questionRepository, groupDailyQuestionRepository);
     }
 
     @Test
@@ -53,15 +56,18 @@ class QuestionServiceTest {
         LocalDate today = LocalDate.now();
         Question question = questionWithId(10L, "질문A", 0);
         GroupDailyQuestion existing = dailyQuestionWithId(100L, question, today);
+        given(groupAccessGuard.getActiveGroup(groupId))
+                .willReturn(activeGroupWithTheme(groupId, null));
 
         given(groupDailyQuestionRepository.findByGroupIdAndServiceDate(groupId, today))
                 .willReturn(Optional.of(existing));
 
-        DailyQuestionResponse response = questionService.getDailyQuestion(groupId);
+        DailyQuestionResponse response = questionService.getDailyQuestion(USER_ID, groupId);
 
         assertThat(response.groupDailyQuestionId()).isEqualTo(100L);
         assertThat(response.questionId()).isEqualTo(10L);
-        verifyNoInteractions(privateGroupRepository, questionRepository);
+        verify(groupAccessGuard).assertMember(groupId, USER_ID);
+        verifyNoInteractions(questionRepository);
         verify(groupDailyQuestionRepository, never()).save(any());
     }
 
@@ -72,9 +78,9 @@ class QuestionServiceTest {
         PrivateGroup group = activeGroupWithTheme(1L, theme);
         Question onlyCandidate = questionWithId(10L, "유일한 질문", 0);
 
+        given(groupAccessGuard.getActiveGroup(groupId)).willReturn(group);
         given(groupDailyQuestionRepository.findByGroupIdAndServiceDate(eq(groupId), any()))
                 .willReturn(Optional.empty());
-        given(privateGroupRepository.findById(groupId)).willReturn(Optional.of(group));
         given(questionRepository.findByThemeIdAndStatus(1L, QuestionStatus.ACTIVE))
                 .willReturn(List.of(onlyCandidate));
         given(groupDailyQuestionRepository.findLastShownDatesByGroupId(groupId))
@@ -82,25 +88,42 @@ class QuestionServiceTest {
         given(groupDailyQuestionRepository.save(any(GroupDailyQuestion.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
 
-        DailyQuestionResponse response = questionService.getDailyQuestion(groupId);
+        DailyQuestionResponse response = questionService.getDailyQuestion(USER_ID, groupId);
 
         assertThat(response.questionId()).isEqualTo(10L);
         assertThat(response.content()).isEqualTo("유일한 질문");
         assertThat(onlyCandidate.getUseCount()).isEqualTo(1);
+        verify(groupAccessGuard).assertMember(groupId, USER_ID);
         verify(groupDailyQuestionRepository).save(any(GroupDailyQuestion.class));
     }
 
     @Test
     void 그룹이_없으면_GROUP_NOT_FOUND_예외를_던진다() {
         Long groupId = 999L;
-        given(groupDailyQuestionRepository.findByGroupIdAndServiceDate(eq(groupId), any()))
-                .willReturn(Optional.empty());
-        given(privateGroupRepository.findById(groupId)).willReturn(Optional.empty());
+        given(groupAccessGuard.getActiveGroup(groupId))
+                .willThrow(new BusinessException(ErrorCode.GROUP_NOT_FOUND));
 
         BusinessException exception = catchThrowableOfType(
-                () -> questionService.getDailyQuestion(groupId), BusinessException.class);
+                () -> questionService.getDailyQuestion(USER_ID, groupId), BusinessException.class);
 
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.GROUP_NOT_FOUND);
+        verifyNoInteractions(groupDailyQuestionRepository, questionRepository);
+    }
+
+    @Test
+    void 그룹_비멤버면_NOT_GROUP_MEMBER_예외를_던진다() {
+        Long groupId = 1L;
+        given(groupAccessGuard.getActiveGroup(groupId))
+                .willReturn(activeGroupWithTheme(groupId, null));
+        willThrow(new BusinessException(ErrorCode.NOT_GROUP_MEMBER))
+                .given(groupAccessGuard)
+                .assertMember(groupId, USER_ID);
+
+        BusinessException exception = catchThrowableOfType(
+                () -> questionService.getDailyQuestion(USER_ID, groupId), BusinessException.class);
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.NOT_GROUP_MEMBER);
+        verifyNoInteractions(groupDailyQuestionRepository, questionRepository);
     }
 
     @Test
@@ -108,12 +131,12 @@ class QuestionServiceTest {
         Long groupId = 1L;
         PrivateGroup group = activeGroupWithTheme(1L, null);
 
+        given(groupAccessGuard.getActiveGroup(groupId)).willReturn(group);
         given(groupDailyQuestionRepository.findByGroupIdAndServiceDate(eq(groupId), any()))
                 .willReturn(Optional.empty());
-        given(privateGroupRepository.findById(groupId)).willReturn(Optional.of(group));
 
         BusinessException exception = catchThrowableOfType(
-                () -> questionService.getDailyQuestion(groupId), BusinessException.class);
+                () -> questionService.getDailyQuestion(USER_ID, groupId), BusinessException.class);
 
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.GROUP_THEME_NOT_SET);
     }
@@ -124,14 +147,14 @@ class QuestionServiceTest {
         GroupTheme theme = themeWithId(1L, "FAMILY");
         PrivateGroup group = activeGroupWithTheme(1L, theme);
 
+        given(groupAccessGuard.getActiveGroup(groupId)).willReturn(group);
         given(groupDailyQuestionRepository.findByGroupIdAndServiceDate(eq(groupId), any()))
                 .willReturn(Optional.empty());
-        given(privateGroupRepository.findById(groupId)).willReturn(Optional.of(group));
         given(questionRepository.findByThemeIdAndStatus(1L, QuestionStatus.ACTIVE))
                 .willReturn(List.of());
 
         BusinessException exception = catchThrowableOfType(
-                () -> questionService.getDailyQuestion(groupId), BusinessException.class);
+                () -> questionService.getDailyQuestion(USER_ID, groupId), BusinessException.class);
 
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.NO_QUESTION_CANDIDATE);
     }
@@ -144,9 +167,9 @@ class QuestionServiceTest {
         Question recentlyShown = questionWithId(10L, "최근에 나온 질문", 5);
         Question eligible = questionWithId(11L, "제외 안 된 질문", 5);
 
+        given(groupAccessGuard.getActiveGroup(groupId)).willReturn(group);
         given(groupDailyQuestionRepository.findByGroupIdAndServiceDate(eq(groupId), any()))
                 .willReturn(Optional.empty());
-        given(privateGroupRepository.findById(groupId)).willReturn(Optional.of(group));
         given(questionRepository.findByThemeIdAndStatus(1L, QuestionStatus.ACTIVE))
                 .willReturn(List.of(recentlyShown, eligible));
         given(groupDailyQuestionRepository.findLastShownDatesByGroupId(groupId))
@@ -154,7 +177,7 @@ class QuestionServiceTest {
         given(groupDailyQuestionRepository.save(any(GroupDailyQuestion.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
 
-        DailyQuestionResponse response = questionService.getDailyQuestion(groupId);
+        DailyQuestionResponse response = questionService.getDailyQuestion(USER_ID, groupId);
 
         assertThat(response.questionId()).isEqualTo(11L);
     }
@@ -167,9 +190,9 @@ class QuestionServiceTest {
         Question shownRecently = questionWithId(10L, "최근", 3);
         Question shownLongerAgo = questionWithId(11L, "더 오래된", 3);
 
+        given(groupAccessGuard.getActiveGroup(groupId)).willReturn(group);
         given(groupDailyQuestionRepository.findByGroupIdAndServiceDate(eq(groupId), any()))
                 .willReturn(Optional.empty());
-        given(privateGroupRepository.findById(groupId)).willReturn(Optional.of(group));
         given(questionRepository.findByThemeIdAndStatus(1L, QuestionStatus.ACTIVE))
                 .willReturn(List.of(shownRecently, shownLongerAgo));
         given(groupDailyQuestionRepository.findLastShownDatesByGroupId(groupId))
@@ -180,7 +203,7 @@ class QuestionServiceTest {
         given(groupDailyQuestionRepository.save(any(GroupDailyQuestion.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
 
-        DailyQuestionResponse response = questionService.getDailyQuestion(groupId);
+        DailyQuestionResponse response = questionService.getDailyQuestion(USER_ID, groupId);
 
         assertThat(response.questionId()).isEqualTo(11L);
     }

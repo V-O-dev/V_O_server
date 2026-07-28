@@ -2,9 +2,8 @@ package com.example.v_o_server.domain.question.service;
 
 import com.example.v_o_server.common.exception.BusinessException;
 import com.example.v_o_server.common.exception.ErrorCode;
-import com.example.v_o_server.domain.group.entity.GroupStatus;
 import com.example.v_o_server.domain.group.entity.PrivateGroup;
-import com.example.v_o_server.domain.group.repository.PrivateGroupRepository;
+import com.example.v_o_server.domain.group.service.GroupAccessGuard;
 import com.example.v_o_server.domain.question.dto.response.DailyQuestionResponse;
 import com.example.v_o_server.domain.question.entity.AssignmentStatus;
 import com.example.v_o_server.domain.question.entity.GroupDailyQuestion;
@@ -31,7 +30,7 @@ public class QuestionService {
     /** 같은 그룹에는 이 기간(일) 내에 나왔던 질문을 우선적으로 다시 배정하지 않는다. */
     private static final int COOLDOWN_DAYS = 30;
 
-    private final PrivateGroupRepository privateGroupRepository;
+    private final GroupAccessGuard groupAccessGuard;
     private final QuestionRepository questionRepository;
     private final GroupDailyQuestionRepository groupDailyQuestionRepository;
 
@@ -39,25 +38,25 @@ public class QuestionService {
      * 그룹의 오늘의 질문을 조회한다. 아직 배정된 적이 없으면 이 시점에 새로 배정한다.
      */
     @Transactional
-    public DailyQuestionResponse getDailyQuestion(Long groupId) {
+    public DailyQuestionResponse getDailyQuestion(Long userId, Long groupId) {
+        PrivateGroup group = groupAccessGuard.getActiveGroup(groupId);
+        groupAccessGuard.assertMember(groupId, userId);
+
         LocalDate today = LocalDate.now();
 
         GroupDailyQuestion dailyQuestion = groupDailyQuestionRepository
                 .findByGroupIdAndServiceDate(groupId, today)
-                .orElseGet(() -> assignDailyQuestion(groupId, today));
+                .orElseGet(() -> assignDailyQuestion(group, today));
 
         return toResponse(dailyQuestion);
     }
 
-    private GroupDailyQuestion assignDailyQuestion(Long groupId, LocalDate today) {
-        PrivateGroup group = privateGroupRepository.findById(groupId)
-                .filter(g -> g.getStatus() == GroupStatus.ACTIVE)
-                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
-
+    private GroupDailyQuestion assignDailyQuestion(PrivateGroup group, LocalDate today) {
         if (group.getTheme() == null) {
             throw new BusinessException(ErrorCode.GROUP_THEME_NOT_SET);
         }
 
+        Long groupId = group.getId();
         List<Question> candidates = questionRepository.findByThemeIdAndStatus(
                 group.getTheme().getId(), QuestionStatus.ACTIVE);
         if (candidates.isEmpty()) {
