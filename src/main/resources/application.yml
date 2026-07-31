@@ -32,6 +32,10 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
 
+cors:
+  # 콤마로 구분. 와일드카드(*) 사용 가능 — Vercel 프리뷰 배포는 URL이 매번 바뀐다.
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,https://*.vercel.app}
+
 jwt:
   secret-key: ${JWT_SECRET_KEY:__CHANGE_ME_BASE64_ENCODED_SECRET_AT_LEAST_32_BYTES__}
   access-token-validity-seconds: 3600
