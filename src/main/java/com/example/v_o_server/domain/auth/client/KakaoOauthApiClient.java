@@ -37,14 +37,14 @@ public class KakaoOauthApiClient implements OauthApiClient {
     }
 
     @Override
-    public OauthTokenResult exchangeToken(String authorizationCode) {
+    public OauthTokenResult exchangeToken(String authorizationCode, String redirectUri) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "authorization_code");
         form.add("client_id", properties.clientId());
         if (properties.clientSecret() != null && !properties.clientSecret().isBlank()) {
             form.add("client_secret", properties.clientSecret());
         }
-        form.add("redirect_uri", properties.redirectUri());
+        form.add("redirect_uri", resolveRedirectUri(redirectUri));
         form.add("code", authorizationCode);
 
         try {
@@ -112,6 +112,11 @@ public class KakaoOauthApiClient implements OauthApiClient {
             log.error("[{}] Kakao unlink 호출 실패. providerUserId={}", ErrorCode.OAUTH_UNLINK_FAILED.getCode(),
                     providerUserId, e);
         }
+    }
+
+    /** 프론트가 실제로 사용한 redirect_uri를 우선하고, 없으면 서버 설정값으로 폴백한다. */
+    private String resolveRedirectUri(String requested) {
+        return (requested != null && !requested.isBlank()) ? requested : properties.redirectUri();
     }
 
     private BusinessException mapTokenExchangeError(RestClientResponseException e) {

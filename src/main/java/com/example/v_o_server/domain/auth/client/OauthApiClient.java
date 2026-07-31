@@ -13,10 +13,13 @@ public interface OauthApiClient {
     /**
      * 인가 코드를 provider의 access token으로 교환한다.
      *
+     * @param redirectUri 인가 코드를 발급받을 때 사용한 값. provider가 동일 여부를 검증하므로
+     *                    프론트가 실제로 사용한 값을 그대로 넘겨야 한다.
+     *                    null이면 서버 설정값(oauth.{provider}.redirect-uri)을 사용한다.
      * @throws com.example.v_o_server.common.exception.BusinessException
      *         인가 코드가 잘못된 경우 OAUTH_INVALID_CODE, provider 통신 실패 시 OAUTH_PROVIDER_ERROR
      */
-    OauthTokenResult exchangeToken(String authorizationCode);
+    OauthTokenResult exchangeToken(String authorizationCode, String redirectUri);
 
     /**
      * @throws com.example.v_o_server.common.exception.BusinessException provider 통신 실패 시 OAUTH_PROVIDER_ERROR

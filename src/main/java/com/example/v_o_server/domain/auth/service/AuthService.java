@@ -78,7 +78,8 @@ public class AuthService {
             throw new BusinessException(ErrorCode.OAUTH_UNSUPPORTED_PROVIDER);
         }
 
-        OauthTokenResult tokenResult = client.exchangeToken(request.authorizationCode());
+        // 프론트 실행 환경(localhost / Vercel)마다 콜백 주소가 달라 요청값을 그대로 전달한다.
+        OauthTokenResult tokenResult = client.exchangeToken(request.authorizationCode(), request.redirectUri());
         OauthUserInfo userInfo = client.fetchUserInfo(tokenResult.accessToken());
 
         LocalDateTime now = LocalDateTime.now();

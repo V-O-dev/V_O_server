@@ -36,8 +36,13 @@ public class NaverOauthApiClient implements OauthApiClient {
         return OauthProvider.NAVER;
     }
 
+    /**
+     * {@code redirectUri}는 사용하지 않는다. 네이버 토큰 발급 API는 다른 provider와 달리
+     * redirect_uri를 파라미터로 받지 않고 state로 요청 일치를 검증한다.
+     * (authorize 단계에서 쓴 콜백 주소는 네이버 콘솔 등록값으로만 검증된다)
+     */
     @Override
-    public OauthTokenResult exchangeToken(String authorizationCode) {
+    public OauthTokenResult exchangeToken(String authorizationCode, String redirectUri) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "authorization_code");
         form.add("client_id", properties.clientId());
