@@ -4,8 +4,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 파일 저장소 추상화 인터페이스.
- * 현재는 로컬 디스크 구현체(LocalFileStorageService)를 사용하며,
- * 추후 S3 인프라 준비 완료 시 S3FileStorageService로 교체 예정.
+ * storage.type 설정값에 따라 LocalFileStorageService 또는 S3FileStorageService가 선택된다.
  */
 public interface FileStorageService {
 
