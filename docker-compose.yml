@@ -32,6 +32,9 @@ services:
       retries: 5
 
   app:
+    # CI가 GHCR에 올린 이미지를 사용한다(EC2는 pull만 수행).
+    # 로컬에서 소스로 직접 빌드하려면 `docker compose up -d --build`.
+    image: ${APP_IMAGE:-ghcr.io/v-o-dev/v_o_server:latest}
     build:
       context: .
       dockerfile: Dockerfile

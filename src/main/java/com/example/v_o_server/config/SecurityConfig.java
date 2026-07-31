@@ -5,6 +5,7 @@ import com.example.v_o_server.common.security.JwtAuthenticationEntryPoint;
 import com.example.v_o_server.common.security.JwtAuthenticationFilter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -22,6 +23,9 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  */
 @Configuration
 @RequiredArgsConstructor
+// @WebMvcTest 등 슬라이스 컨텍스트에는 @ConfigurationPropertiesScan이 적용되지 않으므로
+// SecurityConfig를 import하는 곳이면 어디서든 CorsProperties가 바인딩되도록 명시한다.
+@EnableConfigurationProperties(CorsProperties.class)
 public class SecurityConfig {
 
     /** Swagger / OpenAPI 문서 경로 (항상 공개). */
