@@ -1,3 +1,8 @@
+server:
+  # nginx 뒤에 있으므로 X-Forwarded-Proto/Host를 신뢰해야 요청 URL을 https로 올바르게 인식한다.
+  # (테스트용 OAuth 콜백이 자기 주소를 redirect_uri로 만들 때 필요)
+  forward-headers-strategy: framework
+
 spring:
   application:
     name: V_O_server
