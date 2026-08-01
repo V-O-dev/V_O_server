@@ -6,18 +6,24 @@ import com.example.v_o_server.domain.auth.dto.request.LogoutRequest;
 import com.example.v_o_server.domain.auth.dto.request.RefreshRequest;
 import com.example.v_o_server.domain.auth.dto.response.LoginResponse;
 import com.example.v_o_server.domain.auth.dto.response.RefreshResponse;
+import com.example.v_o_server.domain.auth.entity.OauthProvider;
 import com.example.v_o_server.domain.auth.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @Tag(name = "Auth", description = "OAuth 소셜 로그인/인증")
 @RestController
@@ -33,6 +39,28 @@ public class AuthController {
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         return ApiResponse.success(authService.login(request));
+    }
+
+    /**
+     * 백엔드 단독 테스트용 콜백. 프론트 없이 브라우저에서 provider 로그인만 하면 토큰을 받아볼 수 있다.
+     *
+     * <p>사용법: provider 콘솔에 이 주소를 Redirect URI로 등록한 뒤,
+     * authorize URL의 redirect_uri에 같은 값을 넣고 브라우저로 접속하면
+     * 로그인 완료 후 이 엔드포인트가 토큰을 JSON으로 반환한다.</p>
+     *
+     * <p>인가 코드 없이는 아무것도 할 수 없어(=실제 provider 인증 필수) POST /login과 권한이 동일하다.
+     * 즉 인증 우회 통로가 아니며, 단지 브라우저 리다이렉트를 받아주는 편의 기능이다.</p>
+     */
+    @Operation(summary = "[테스트용] OAuth 콜백 수신", description = "프론트 없이 토큰을 발급받기 위한 개발 편의용 엔드포인트.")
+    @GetMapping("/dev/callback/{provider}")
+    public ApiResponse<LoginResponse> devCallback(@PathVariable String provider,
+            @RequestParam("code") String code) {
+        // 토큰 교환 시 provider가 authorize 때 쓴 값과 동일한지 검증하므로,
+        // 지금 요청이 들어온 주소(쿼리 제외)를 그대로 redirect_uri로 사용한다.
+        String redirectUri = ServletUriComponentsBuilder.fromCurrentRequestUri().toUriString();
+
+        OauthProvider oauthProvider = OauthProvider.valueOf(provider.toUpperCase(Locale.ROOT));
+        return ApiResponse.success(authService.login(new LoginRequest(oauthProvider, code, redirectUri)));
     }
 
     @Operation(summary = "토큰 재발급", description = "refreshToken을 검증해 accessToken/refreshToken을 재발급한다 (rotation).")
