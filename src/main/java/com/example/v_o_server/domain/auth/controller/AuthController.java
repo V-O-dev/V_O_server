@@ -11,8 +11,12 @@ import com.example.v_o_server.domain.auth.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.net.URI;
 import java.util.Locale;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,6 +36,8 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class AuthController {
 
     private static final String BEARER_PREFIX = "Bearer ";
+    /** 테스트용 콜백 경로. 로그인 진입점과 콜백이 같은 주소를 쓰도록 상수로 공유한다. */
+    private static final String DEV_CALLBACK_PATH = "/api/v1/auth/dev/callback/";
 
     private final AuthService authService;
 
@@ -39,6 +45,31 @@ public class AuthController {
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         return ApiResponse.success(authService.login(request));
+    }
+
+    /**
+     * 백엔드 단독 테스트용 로그인 진입점.
+     * 이 주소로 접속하면 provider 로그인 페이지로 리다이렉트되고, 로그인 후 아래 콜백이 토큰을 반환한다.
+     * 긴 authorize URL을 직접 조립할 필요가 없다.
+     */
+    @Operation(summary = "[테스트용] 소셜 로그인 시작",
+            description = "브라우저로 접속하면 provider 로그인 화면으로 이동한다. 로그인하면 토큰이 JSON으로 표시된다.")
+    @GetMapping("/dev/login/{provider}")
+    public ResponseEntity<Void> devLogin(@PathVariable String provider) {
+        OauthProvider oauthProvider = OauthProvider.valueOf(provider.toUpperCase(Locale.ROOT));
+
+        // 콜백 주소는 이 서버의 dev 콜백. authorize와 토큰 교환에서 같은 값이 쓰이도록 여기서 한 번만 만든다.
+        String callbackUri = ServletUriComponentsBuilder.fromCurrentContextPath()
+                .path(DEV_CALLBACK_PATH)
+                .path(provider.toLowerCase(Locale.ROOT))
+                .toUriString();
+
+        String authorizeUrl = authService.buildAuthorizeUrl(
+                oauthProvider, callbackUri, UUID.randomUUID().toString());
+
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(URI.create(authorizeUrl))
+                .build();
     }
 
     /**

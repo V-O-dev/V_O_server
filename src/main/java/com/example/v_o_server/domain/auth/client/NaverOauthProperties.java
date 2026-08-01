@@ -7,6 +7,7 @@ public record NaverOauthProperties(
         String clientId,
         String clientSecret,
         String redirectUri,
+        String authorizeUri,
         String tokenUri,
         String userInfoUri
 ) {

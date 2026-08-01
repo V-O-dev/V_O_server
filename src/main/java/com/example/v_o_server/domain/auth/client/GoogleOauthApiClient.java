@@ -13,6 +13,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Google OAuth 연동.
@@ -33,6 +34,19 @@ public class GoogleOauthApiClient implements OauthApiClient {
     @Override
     public OauthProvider getProvider() {
         return OauthProvider.GOOGLE;
+    }
+
+    @Override
+    public String buildAuthorizeUrl(String redirectUri, String state) {
+        return UriComponentsBuilder.fromUriString(properties.authorizeUri())
+                .queryParam("client_id", properties.clientId())
+                .queryParam("redirect_uri", redirectUri)
+                .queryParam("response_type", "code")
+                // 구글은 scope를 명시해야 이메일/프로필을 내려준다
+                .queryParam("scope", "openid email profile")
+                .queryParam("state", state)
+                .encode()
+                .toUriString();
     }
 
     @Override
