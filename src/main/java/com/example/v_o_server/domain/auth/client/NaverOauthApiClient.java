@@ -14,6 +14,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Naver OAuth 연동.
@@ -34,6 +35,18 @@ public class NaverOauthApiClient implements OauthApiClient {
     @Override
     public OauthProvider getProvider() {
         return OauthProvider.NAVER;
+    }
+
+    @Override
+    public String buildAuthorizeUrl(String redirectUri, String state) {
+        return UriComponentsBuilder.fromUriString(properties.authorizeUri())
+                .queryParam("client_id", properties.clientId())
+                .queryParam("redirect_uri", redirectUri)
+                .queryParam("response_type", "code")
+                // 네이버는 state가 필수다
+                .queryParam("state", state)
+                .encode()
+                .toUriString();
     }
 
     /**
