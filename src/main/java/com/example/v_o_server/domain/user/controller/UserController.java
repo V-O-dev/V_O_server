@@ -4,6 +4,7 @@ import com.example.v_o_server.common.response.ApiResponse;
 import com.example.v_o_server.domain.user.dto.request.UpdateNicknameRequest;
 import com.example.v_o_server.domain.user.dto.request.UpdateNotificationSettingsRequest;
 import com.example.v_o_server.domain.user.dto.response.NotificationSettingsResponse;
+import com.example.v_o_server.domain.user.dto.response.ProfileCreateResponse;
 import com.example.v_o_server.domain.user.dto.response.ProfileImageResponse;
 import com.example.v_o_server.domain.user.dto.response.UserMeResponse;
 import com.example.v_o_server.domain.user.service.UserService;
@@ -15,8 +16,10 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -33,6 +36,16 @@ public class UserController {
     @GetMapping("/me")
     public ApiResponse<UserMeResponse> getMe(@AuthenticationPrincipal Long userId) {
         UserMeResponse response = userService.getMe(userId);
+        return ApiResponse.success(response);
+    }
+
+    @Operation(summary = "온보딩 프로필 생성",
+            description = "온보딩에서 입력한 이름과 프로필 사진으로 프로필을 생성합니다. 사진은 선택 사항입니다.")
+    @PostMapping(value = "/me/profile", consumes = "multipart/form-data")
+    public ApiResponse<ProfileCreateResponse> createProfile(@AuthenticationPrincipal Long userId,
+            @RequestParam("nickname") String nickname,
+            @RequestPart(value = "image", required = false) MultipartFile image) {
+        ProfileCreateResponse response = userService.createProfile(userId, nickname, image);
         return ApiResponse.success(response);
     }
 

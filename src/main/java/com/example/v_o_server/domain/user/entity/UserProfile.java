@@ -50,6 +50,11 @@ public class UserProfile extends BaseTimeEntity {
         this.profileImageObjectKey = profileImageObjectKey;
     }
 
+    /** 온보딩(이름·사진 입력) 완료 시각을 기록한다. 클라이언트는 이 값으로 온보딩 재진입 여부를 판단한다. */
+    public void completeOnboarding(LocalDateTime now) {
+        this.onboardingCompletedAt = now;
+    }
+
     public void updateNickname(String nickname) {
         this.nickname = nickname;
     }
