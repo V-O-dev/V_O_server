@@ -31,10 +31,11 @@ public class DeviceController {
         return ApiResponse.ok();
     }
 
-    @Operation(summary = "디바이스 토큰 해제", description = "등록된 디바이스 토큰을 해제합니다.")
+    @Operation(summary = "디바이스 토큰 해제", description = "본인이 등록한 디바이스 토큰을 해제합니다.")
     @DeleteMapping
-    public ApiResponse<Void> unregisterDevice(@Valid @RequestBody UnregisterDeviceRequest request) {
-        deviceService.unregisterDevice(request.deviceToken());
+    public ApiResponse<Void> unregisterDevice(@AuthenticationPrincipal Long userId,
+            @Valid @RequestBody UnregisterDeviceRequest request) {
+        deviceService.unregisterDevice(userId, request.deviceToken());
         return ApiResponse.ok();
     }
 }
