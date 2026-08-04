@@ -9,6 +9,7 @@ import com.example.v_o_server.domain.notification.dto.response.NotificationReadR
 import com.example.v_o_server.domain.notification.dto.response.NotificationResponse;
 import com.example.v_o_server.domain.notification.entity.AppNotification;
 import com.example.v_o_server.domain.notification.entity.NotificationType;
+import com.example.v_o_server.domain.notification.event.NotificationCreatedEvent;
 import com.example.v_o_server.domain.notification.repository.AppNotificationRepository;
 import com.example.v_o_server.domain.question.entity.GroupDailyQuestion;
 import com.example.v_o_server.domain.user.entity.User;
@@ -16,6 +17,7 @@ import com.example.v_o_server.domain.user.repository.UserProfileRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,7 @@ public class AppNotificationService {
 
     private final AppNotificationRepository appNotificationRepository;
     private final UserProfileRepository userProfileRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** 알림 목록 조회 (최신순). 알림이 없으면 빈 목록을 반환한다(에러 아님). */
     public NotificationListResponse getNotifications(Long userId, Long cursor) {
@@ -115,9 +118,6 @@ public class AppNotificationService {
 
     private void save(NotificationType type, String title, String body, User recipient, User actor,
             PrivateGroup group, GroupDailyQuestion groupDailyQuestion, Video video) {
-        // TODO: FCM 연동 시 여기서 푸시 발송을 트리거한다. 단 User의 알림 설정
-        //  (interactionNotificationEnabled / dailyQuestionNotificationEnabled)이 꺼져 있으면
-        //  DB 저장은 하되 푸시는 보내지 않는다.
         appNotificationRepository.save(AppNotification.builder()
                 .notificationType(type)
                 .title(title)
@@ -129,6 +129,19 @@ public class AppNotificationService {
                 .groupDailyQuestion(groupDailyQuestion)
                 .video(video)
                 .build());
+
+        // 수신 거부 상태여도 알림 자체는 위에서 저장된다. 푸시만 보내지 않는다.
+        if (isPushEnabled(recipient, type)) {
+            eventPublisher.publishEvent(new NotificationCreatedEvent(
+                    recipient.getId(), type, title, body, video == null ? null : video.getId()));
+        }
+    }
+
+    private boolean isPushEnabled(User recipient, NotificationType type) {
+        Boolean enabled = type == NotificationType.DAILY_QUESTION
+                ? recipient.getDailyQuestionNotificationEnabled()
+                : recipient.getInteractionNotificationEnabled();
+        return Boolean.TRUE.equals(enabled);
     }
 
     private boolean isSelfAction(User recipient, User actor) {
