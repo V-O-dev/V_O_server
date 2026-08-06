@@ -66,7 +66,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(SWAGGER_WHITELIST).permitAll()
                         .requestMatchers(HttpMethod.POST, AUTH_WHITELIST).permitAll()
-                        // 테스트용 OAuth 로그인 진입점/콜백 (provider 리다이렉트라 인증 헤더가 없다)
+                        // OAuth 로그인 진입점/콜백 (브라우저 리다이렉트라 인증 헤더가 없다)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/auth/oauth/**").permitAll()
+                        // 테스트용 OAuth 로그인 진입점/콜백
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/dev/**").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
