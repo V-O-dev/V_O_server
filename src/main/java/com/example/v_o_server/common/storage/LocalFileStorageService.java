@@ -10,15 +10,17 @@ import java.util.Locale;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * S3 인프라 준비 전 임시로 사용하는 로컬 디스크 저장 구현체.
- * 추후 S3FileStorageService로 교체 예정 (인프라 담당: 민스).
+ * 로컬 개발 환경에서 사용하는 디스크 저장 구현체.
+ * storage.type=local(기본값)일 때 활성화되며, storage.type=s3이면 S3FileStorageService가 대신 사용된다.
  */
 @Slf4j
 @Service
+@ConditionalOnProperty(prefix = "storage", name = "type", havingValue = "local", matchIfMissing = true)
 public class LocalFileStorageService implements FileStorageService {
 
     private static final String BASE_DIR = "uploads";

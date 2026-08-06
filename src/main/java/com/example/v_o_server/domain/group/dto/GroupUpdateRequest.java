@@ -5,7 +5,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
- * 그룹 정보 수정 요청 (multipart). 두 필드 모두 선택이지만 최소 1개는 있어야 한다.
+ * 그룹 정보 수정 요청 (multipart). 모든 필드가 선택이지만 최소 1개는 있어야 한다(서비스에서 검증).
  * 이미지는 multipart 파트로 별도 전달된다.
  */
 @Schema(description = "그룹 정보 수정 요청")
@@ -13,6 +13,9 @@ public record GroupUpdateRequest(
         @Schema(description = "변경할 그룹명 (1~15자)", example = "새 그룹명")
         @Size(min = 1, max = 15, message = "그룹명은 1~15자여야 합니다.")
         @Pattern(regexp = "^[가-힣a-zA-Z0-9 ]+$", message = "그룹명에 특수문자는 사용할 수 없습니다.")
-        String groupName
+        String groupName,
+
+        @Schema(description = "변경할 테마 코드 (선택)", example = "COUPLE")
+        String themeCode
 ) {
 }

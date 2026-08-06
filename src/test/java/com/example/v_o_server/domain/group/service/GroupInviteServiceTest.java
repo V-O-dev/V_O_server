@@ -15,6 +15,7 @@ import static org.mockito.Mockito.verify;
 
 import com.example.v_o_server.common.exception.BusinessException;
 import com.example.v_o_server.common.exception.ErrorCode;
+import com.example.v_o_server.common.qr.QrCodeGenerator;
 import com.example.v_o_server.domain.group.dto.GroupJoinResponse;
 import com.example.v_o_server.domain.group.dto.InviteCodeResponse;
 import com.example.v_o_server.domain.group.entity.GroupInvite;
@@ -65,6 +66,8 @@ class GroupInviteServiceTest {
     private InviteCodeGenerator inviteCodeGenerator;
     @Mock
     private GroupInviteWriter groupInviteWriter;
+    @Mock
+    private QrCodeGenerator qrCodeGenerator;
 
     @InjectMocks
     private GroupInviteService groupInviteService;
@@ -111,6 +114,22 @@ class GroupInviteServiceTest {
 
             assertThat(response.code()).isEqualTo(CODE);
             verify(groupInviteWriter, times(2)).save(eq(GROUP_ID), eq(OWNER_ID), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("아직 유효한 코드가 있으면 새로 만들지 않고 그대로 반환한다")
+        void reusesUsableCode() {
+            PrivateGroup group = group(GROUP_ID, user(OWNER_ID), 15);
+            given(groupInviteRepository.findFirstByGroupIdAndStatusAndExpiresAtAfterOrderByExpiresAtDesc(
+                    eq(GROUP_ID), eq(InviteStatus.ACTIVE), any()))
+                    .willReturn(Optional.of(usableInvite(group)));
+
+            InviteCodeResponse response = groupInviteService.issueInviteCode(OWNER_ID, GROUP_ID);
+
+            assertThat(response.code()).isEqualTo(CODE);
+            assertThat(response.qrImageUrl()).isEqualTo("/invites/" + CODE + "/qr");
+            verify(groupInviteWriter, never()).save(any(), any(), any(), any(), any());
+            verify(inviteCodeGenerator, never()).generate();
         }
 
         @Test
@@ -230,11 +249,33 @@ class GroupInviteServiceTest {
         }
 
         @Test
+        @DisplayName("강제 퇴장된 사용자는 유효한 코드를 받아도 KICKED_FROM_GROUP")
+        void rejectsKickedMember() {
+            PrivateGroup group = group(GROUP_ID, user(OWNER_ID), 15);
+            GroupMember kicked = member(11L, group, user(JOINER_ID), GroupMemberRole.MEMBER, MemberStatus.ACTIVE);
+            kicked.kick(OWNER_ID, LocalDateTime.now().minusDays(1));
+
+            given(groupInviteRepository.findByInviteCode(CODE)).willReturn(Optional.of(usableInvite(group)));
+            given(privateGroupRepository.findByIdAndStatusForUpdate(GROUP_ID, GroupStatus.ACTIVE))
+                    .willReturn(Optional.of(group));
+            given(groupMemberRepository.countByGroupIdAndStatus(GROUP_ID, MemberStatus.ACTIVE)).willReturn(3L);
+            given(groupMemberRepository.findByGroupIdAndUserId(GROUP_ID, JOINER_ID))
+                    .willReturn(Optional.of(kicked));
+
+            assertThatThrownBy(() -> groupInviteService.joinByInviteCode(JOINER_ID, CODE))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode").isEqualTo(ErrorCode.KICKED_FROM_GROUP);
+
+            assertThat(kicked.getStatus()).isEqualTo(MemberStatus.KICKED);
+            verify(groupMemberRepository, never()).save(any());
+        }
+
+        @Test
         @DisplayName("나갔던 사용자는 기존 멤버십 행을 재활성화한다 (새 행 insert 아님)")
         void reactivatesLeftMembership() {
             PrivateGroup group = group(GROUP_ID, user(OWNER_ID), 15);
             GroupMember left = member(11L, group, user(JOINER_ID), GroupMemberRole.MEMBER, MemberStatus.ACTIVE);
-            left.kick(OWNER_ID, LocalDateTime.now().minusDays(1));
+            left.leave(LocalDateTime.now().minusDays(1));
 
             given(groupInviteRepository.findByInviteCode(CODE)).willReturn(Optional.of(usableInvite(group)));
             given(privateGroupRepository.findByIdAndStatusForUpdate(GROUP_ID, GroupStatus.ACTIVE))
@@ -248,6 +289,47 @@ class GroupInviteServiceTest {
             assertThat(left.getLeftAt()).isNull();
             assertThat(left.getKickedBy()).isNull();
             verify(groupMemberRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("초대 QR 이미지")
+    class InviteQr {
+
+        @Test
+        @DisplayName("유효한 코드면 초대 링크를 인코딩한 PNG를 반환한다")
+        void generatesPng() {
+            PrivateGroup group = group(GROUP_ID, user(OWNER_ID), 15);
+            byte[] png = {(byte) 0x89, 'P', 'N', 'G'};
+            given(groupInviteRepository.findByInviteCode(CODE)).willReturn(Optional.of(usableInvite(group)));
+            given(qrCodeGenerator.generatePng("https://v-o.app/invites/" + CODE, 512)).willReturn(png);
+
+            assertThat(groupInviteService.getInviteQrImage(CODE, null)).isEqualTo(png);
+        }
+
+        @Test
+        @DisplayName("허용 범위를 벗어난 size면 조회 전에 INVALID_INPUT_VALUE")
+        void rejectsOutOfRangeSize() {
+            assertThatThrownBy(() -> groupInviteService.getInviteQrImage(CODE, 4096))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+            verify(qrCodeGenerator, never()).generatePng(any(), org.mockito.ArgumentMatchers.anyInt());
+        }
+
+        @Test
+        @DisplayName("만료된 코드면 INVITE_EXPIRED — QR을 만들지 않는다")
+        void rejectsExpiredCode() {
+            PrivateGroup group = group(GROUP_ID, user(OWNER_ID), 15);
+            GroupInvite expired = invite(1L, group, user(OWNER_ID), CODE,
+                    LocalDateTime.now().minusMinutes(1), InviteStatus.ACTIVE);
+            given(groupInviteRepository.findByInviteCode(CODE)).willReturn(Optional.of(expired));
+
+            assertThatThrownBy(() -> groupInviteService.getInviteQrImage(CODE, null))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode").isEqualTo(ErrorCode.INVITE_EXPIRED);
+
+            verify(qrCodeGenerator, never()).generatePng(any(), org.mockito.ArgumentMatchers.anyInt());
         }
     }
 }

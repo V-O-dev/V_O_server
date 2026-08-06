@@ -73,6 +73,11 @@ public class GroupMember extends BaseTimeEntity {
         return role == GroupMemberRole.OWNER;
     }
 
+    /** 강제 퇴장 이력 — 재가입 차단(블랙리스트) 판단에 쓴다. */
+    public boolean isKicked() {
+        return status == MemberStatus.KICKED;
+    }
+
     public void changeRole(GroupMemberRole role) {
         this.role = role;
     }
@@ -90,8 +95,16 @@ public class GroupMember extends BaseTimeEntity {
         this.leftAt = leftAt;
     }
 
-    /** LEFT/KICKED 멤버의 재가입 — 이력 행을 재사용한다. */
+    /**
+     * 나갔던(LEFT) 멤버의 재가입 — 이력 행을 재사용한다.
+     *
+     * <p>강제 퇴장(KICKED) 이력은 재가입 차단 대상이므로 이 메서드로 되살릴 수 없다.
+     * 서비스 계층 검증을 우회한 호출을 엔티티에서 한 번 더 막는다.</p>
+     */
     public void rejoin(LocalDateTime joinedAt) {
+        if (status == MemberStatus.KICKED) {
+            throw new IllegalStateException("강제 퇴장된 멤버는 재가입할 수 없습니다. memberId=" + id);
+        }
         this.status = MemberStatus.ACTIVE;
         this.role = GroupMemberRole.MEMBER;
         this.joinedAt = joinedAt;

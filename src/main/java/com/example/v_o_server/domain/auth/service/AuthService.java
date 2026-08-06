@@ -72,13 +72,26 @@ public class AuthService {
         this.tokenBlacklistService = tokenBlacklistService;
     }
 
+    /**
+     * provider 로그인 페이지 URL을 만든다. (테스트용 로그인 진입점에서 사용)
+     */
+    @Transactional(readOnly = true)
+    public String buildAuthorizeUrl(OauthProvider provider, String redirectUri, String state) {
+        OauthApiClient client = oauthApiClients.get(provider);
+        if (client == null) {
+            throw new BusinessException(ErrorCode.OAUTH_UNSUPPORTED_PROVIDER);
+        }
+        return client.buildAuthorizeUrl(redirectUri, state);
+    }
+
     public LoginResponse login(LoginRequest request) {
         OauthApiClient client = oauthApiClients.get(request.provider());
         if (client == null) {
             throw new BusinessException(ErrorCode.OAUTH_UNSUPPORTED_PROVIDER);
         }
 
-        OauthTokenResult tokenResult = client.exchangeToken(request.authorizationCode());
+        // 프론트 실행 환경(localhost / Vercel)마다 콜백 주소가 달라 요청값을 그대로 전달한다.
+        OauthTokenResult tokenResult = client.exchangeToken(request.authorizationCode(), request.redirectUri());
         OauthUserInfo userInfo = client.fetchUserInfo(tokenResult.accessToken());
 
         LocalDateTime now = LocalDateTime.now();

@@ -1,0 +1,99 @@
+name: Deploy
+
+# develop 병합 시 이미지를 빌드해 GHCR에 올리고 EC2에서 pull 받아 재기동한다.
+# EC2에서 직접 빌드하지 않으므로 인스턴스 사양이 낮아도 배포 중 메모리 문제가 없다.
+#
+# 현재 서버가 EC2 한 대뿐이라 통합 브랜치(develop)를 배포 대상으로 둔다.
+# 운영 서버가 분리되면 main을 추가하고 environment로 분기할 것.
+on:
+  push:
+    branches: [ develop ]
+  # 코드 변경 없이 재배포가 필요할 때 Actions 탭에서 수동 실행
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # GHCR은 이미지 이름에 대문자를 허용하지 않아 소문자로 변환한다 (V-O-dev/V_O_server → v-o-dev/v_o_server)
+      - name: Resolve image name
+        id: meta
+        run: echo "image=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:latest
+            ${{ steps.meta.outputs.image }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          envs: GHCR_USERNAME,GHCR_TOKEN,IMAGE,DEPLOY_BRANCH
+          script: |
+            set -e
+            cd "${{ secrets.EC2_PROJECT_PATH }}"
+
+            # docker-compose.yml / nginx.conf 등 배포 설정 파일 갱신 (.env는 git 미추적이라 보존됨)
+            git fetch origin "$DEPLOY_BRANCH"
+            git reset --hard "origin/$DEPLOY_BRANCH"
+
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+
+            docker compose pull app
+            docker compose up -d
+            docker image prune -f
+
+            docker compose ps
+        env:
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GHCR_PAT }}
+          IMAGE: ${{ needs.build-and-push.outputs.image }}
+          # 워크플로를 트리거한 브랜치(develop). EC2가 이 브랜치 기준으로 설정 파일을 맞춘다.
+          DEPLOY_BRANCH: ${{ github.ref_name }}
+
+      - name: Health check
+        run: |
+          for i in $(seq 1 20); do
+            if curl -sf --max-time 5 "${{ secrets.HEALTH_CHECK_URL }}" > /dev/null; then
+              echo "✅ 헬스체크 성공"
+              exit 0
+            fi
+            echo "대기 중... ($i/20)"
+            sleep 5
+          done
+          echo "❌ 헬스체크 실패 — 서버가 정상 기동되지 않았습니다"
+          exit 1

@@ -7,7 +7,7 @@ import org.springframework.http.HttpStatus;
 /**
  * 애플리케이션 전역 에러 코드 정의.
  *
- * <p>code 접두사 규칙: C=공통, A=인증/인가, U=user, V=영상/리액션/댓글, G=group, N=알림.</p>
+ * <p>code 접두사 규칙: C=공통, A=인증/인가, U=user, G=group, N=알림, Q=질문, V=영상/리액션/댓글.</p>
  */
 @Getter
 @RequiredArgsConstructor
@@ -33,6 +33,7 @@ public enum ErrorCode {
     WITHDRAW_OWNER_EXISTS(HttpStatus.CONFLICT, "A008", "방장으로 있는 그룹이 남아있어 탈퇴할 수 없습니다."),
     /** 로깅/추적 태그 용도. 정책상 클라이언트로 던지지 않고 탈퇴 자체는 롤백하지 않는다. */
     OAUTH_UNLINK_FAILED(HttpStatus.BAD_GATEWAY, "A009", "OAuth provider unlink에 실패했습니다."),
+    OAUTH_INVALID_STATE(HttpStatus.UNAUTHORIZED, "A010", "로그인 요청이 만료되었거나 유효하지 않습니다. 다시 시도해주세요."),
 
     // 사용자
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U001", "사용자를 찾을 수 없습니다."),
@@ -47,6 +48,7 @@ public enum ErrorCode {
     IMAGE_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "U010", "이미지 삭제에 실패했습니다. 다시 시도해주세요."),
     DEVICE_TOKEN_REQUIRED(HttpStatus.BAD_REQUEST, "U011", "디바이스 토큰이 필요합니다."),
     INVALID_PLATFORM(HttpStatus.BAD_REQUEST, "U012", "유효하지 않은 플랫폼 값입니다."),
+    PROFILE_ALREADY_EXISTS(HttpStatus.CONFLICT, "U013", "이미 프로필이 존재합니다."),
 
     // 그룹
     GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "G001", "그룹을 찾을 수 없습니다."),
@@ -57,17 +59,18 @@ public enum ErrorCode {
     INVITE_NOT_FOUND(HttpStatus.NOT_FOUND, "G006", "초대 정보를 찾을 수 없습니다."),
     INVITE_EXPIRED(HttpStatus.GONE, "G007", "만료된 초대 코드입니다."),
     ALREADY_GROUP_MEMBER(HttpStatus.CONFLICT, "G008", "이미 가입된 그룹입니다."),
-    OWNER_CANNOT_LEAVE(HttpStatus.CONFLICT, "G009", "방장은 권한을 위임한 뒤 나갈 수 있습니다."),
+    OWNER_CANNOT_LEAVE(HttpStatus.CONFLICT, "G009", "권한을 위임하거나 그룹을 삭제해 주세요."),
     CANNOT_KICK_SELF(HttpStatus.BAD_REQUEST, "G010", "자기 자신을 강제 퇴장시킬 수 없습니다."),
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "G011", "그룹 멤버를 찾을 수 없습니다."),
     THEME_NOT_FOUND(HttpStatus.NOT_FOUND, "G012", "그룹 테마를 찾을 수 없습니다."),
-    INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "G013", "알림 시간 범위가 올바르지 않습니다."), 
+    INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "G013", "알림 시간 범위가 올바르지 않습니다."),
     GROUP_THEME_NOT_SET(HttpStatus.BAD_REQUEST, "G014", "그룹에 테마가 설정되어 있지 않습니다."),
-    
-  // 알림
+    KICKED_FROM_GROUP(HttpStatus.FORBIDDEN, "G015", "강제 퇴장된 그룹에는 다시 가입할 수 없습니다."),
+    QR_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "G016", "QR 이미지 생성에 실패했습니다."),
+
+    // 알림
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "N001", "알림을 찾을 수 없습니다."),
     NOTIFICATION_NO_PERMISSION(HttpStatus.FORBIDDEN, "N002", "해당 알림에 접근할 권한이 없습니다."),
-
 
     // 질문
     NO_QUESTION_CANDIDATE(HttpStatus.NOT_FOUND, "Q001", "테마에 해당하는 추천 가능한 질문이 없습니다."),

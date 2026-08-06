@@ -1,7 +1,7 @@
 package com.example.v_o_server.domain.answer.controller;
 
 import com.example.v_o_server.common.response.ApiResponse;
-import com.example.v_o_server.domain.answer.dto.request.VideoUploadMetadataRequest;
+import com.example.v_o_server.domain.answer.dto.request.VideoUploadForm;
 import com.example.v_o_server.domain.answer.dto.response.VideoResponse;
 import com.example.v_o_server.domain.answer.service.VideoService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,9 +14,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "Video", description = "답변 영상 관련 API")
 @RestController
@@ -30,9 +28,8 @@ public class VideoController {
     @PostMapping(consumes = "multipart/form-data")
     public ApiResponse<VideoResponse> uploadVideo(
             @AuthenticationPrincipal Long userId,
-            @RequestPart("video") MultipartFile video,
-            @Valid @ModelAttribute VideoUploadMetadataRequest metadata) {
-        VideoResponse response = videoService.uploadVideo(userId, metadata, video);
+            @Valid @ModelAttribute VideoUploadForm form) {
+        VideoResponse response = videoService.uploadVideo(userId, form.toMetadata(), form.video());
         return ApiResponse.success(response);
     }
 

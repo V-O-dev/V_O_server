@@ -28,11 +28,12 @@ public class ArchiveController {
     private final ArchiveService archiveService;
 
     @Operation(summary = "캘린더(월별 Dot) 조회",
-            description = "해당 그룹에서 내가 기록을 남긴 날짜 목록을 조회합니다. 본인 기록만 반환됩니다.")
+            description = "내가 기록을 남긴 날짜 목록을 조회합니다. groupId를 생략하면 내가 속한 모든 그룹을 통합해 "
+                    + "조회하고, 지정하면 그 그룹만 봅니다. 항상 본인 기록만, 현재 속한 그룹만 반환됩니다.")
     @GetMapping("/calendar")
     public ApiResponse<ArchiveCalendarResponse> getCalendar(
             @AuthenticationPrincipal Long userId,
-            @RequestParam Long groupId,
+            @RequestParam(required = false) Long groupId,
             @RequestParam @Min(value = 2000, message = "연도는 2000 이상이어야 합니다.")
             @Max(value = 2100, message = "연도는 2100 이하여야 합니다.") int year,
             @RequestParam @Min(value = 1, message = "월은 1 이상이어야 합니다.")
@@ -41,11 +42,12 @@ public class ArchiveController {
     }
 
     @Operation(summary = "일자별 기록 조회",
-            description = "해당 그룹·날짜의 내 기록 카드를 조회합니다. 기록이 없으면 빈 목록을 반환합니다.")
+            description = "해당 날짜의 내 기록 카드를 조회합니다. groupId를 생략하면 내가 속한 모든 그룹을 통합해 "
+                    + "조회합니다(같은 날 여러 그룹 카드). 기록이 없으면 빈 목록을 반환합니다.")
     @GetMapping("/daily")
     public ApiResponse<ArchiveDailyResponse> getDaily(
             @AuthenticationPrincipal Long userId,
-            @RequestParam Long groupId,
+            @RequestParam(required = false) Long groupId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return ApiResponse.success(archiveService.getDailyRecords(userId, groupId, date));
     }
