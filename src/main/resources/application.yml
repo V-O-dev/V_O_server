@@ -39,8 +39,9 @@ spring:
 
 app:
   frontend:
-    # 로그인 후 돌아갈 프론트 기본 주소. 요청에 redirectUri가 있으면 그 값이 우선한다.
-    base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+    # 로그인 후 돌아갈 프론트 기본 주소(배포 프론트로 고정).
+    # 로컬 프론트로 받으려면 요청에 redirectUri를 넘기거나 FRONTEND_BASE_URL 환경변수로 덮어쓴다.
+    base-url: ${FRONTEND_BASE_URL:https://v-o-web-1fqd.vercel.app}
     # 최종 콜백 주소 = base-url + oauth-callback-path + provider (예: /oauth/kakao)
     oauth-callback-path: ${FRONTEND_OAUTH_CALLBACK_PATH:/oauth/}
 
