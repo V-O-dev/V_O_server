@@ -11,6 +11,7 @@ import com.example.v_o_server.common.exception.ErrorCode;
 import com.example.v_o_server.common.security.JwtAuthenticationFilter;
 import com.example.v_o_server.config.SecurityConfig;
 import com.example.v_o_server.domain.question.dto.response.DailyQuestionResponse;
+import com.example.v_o_server.domain.question.dto.response.UnansweredQuestionResponse;
 import com.example.v_o_server.domain.question.service.QuestionService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -90,6 +91,32 @@ class QuestionControllerTest {
                         .with(authUser()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("G003"));
+    }
+
+    @Test
+    @DisplayName("인증 사용자 기준으로 답변 대기 중인 질문 목록을 조회한다")
+    void getUnansweredQuestions() throws Exception {
+        UnansweredQuestionResponse response = new UnansweredQuestionResponse(
+                1L,
+                "우리 가족",
+                10L,
+                20L,
+                "오늘 가장 고마웠던 일은?",
+                10_000,
+                LocalDate.of(2026, 7, 28),
+                LocalDateTime.of(2026, 7, 29, 0, 0)
+        );
+        given(questionService.getUnansweredQuestions(AUTH_USER_ID))
+                .willReturn(List.of(response));
+
+        mockMvc.perform(get("/api/v1/questions/unanswered").with(authUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].groupId").value(1))
+                .andExpect(jsonPath("$.data[0].groupName").value("우리 가족"))
+                .andExpect(jsonPath("$.data[0].questionId").value(20));
+
+        verify(questionService).getUnansweredQuestions(AUTH_USER_ID);
     }
 
     private static RequestPostProcessor authUser() {

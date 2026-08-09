@@ -13,11 +13,18 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.example.v_o_server.common.exception.BusinessException;
 import com.example.v_o_server.common.exception.ErrorCode;
+import com.example.v_o_server.domain.answer.entity.AnswerUploadStatus;
+import com.example.v_o_server.domain.answer.repository.DailyAnswerRepository;
+import com.example.v_o_server.domain.group.entity.GroupMember;
+import com.example.v_o_server.domain.group.entity.GroupMemberRole;
 import com.example.v_o_server.domain.group.entity.GroupStatus;
 import com.example.v_o_server.domain.group.entity.GroupTheme;
+import com.example.v_o_server.domain.group.entity.MemberStatus;
 import com.example.v_o_server.domain.group.entity.PrivateGroup;
+import com.example.v_o_server.domain.group.repository.GroupMemberRepository;
 import com.example.v_o_server.domain.group.service.GroupAccessGuard;
 import com.example.v_o_server.domain.question.dto.response.DailyQuestionResponse;
+import com.example.v_o_server.domain.question.dto.response.UnansweredQuestionResponse;
 import com.example.v_o_server.domain.question.entity.AssignmentStatus;
 import com.example.v_o_server.domain.question.entity.GroupDailyQuestion;
 import com.example.v_o_server.domain.question.entity.Question;
@@ -38,16 +45,22 @@ class QuestionServiceTest {
     private static final Long USER_ID = 7L;
 
     private GroupAccessGuard groupAccessGuard;
+    private GroupMemberRepository groupMemberRepository;
     private QuestionRepository questionRepository;
     private GroupDailyQuestionRepository groupDailyQuestionRepository;
+    private DailyAnswerRepository dailyAnswerRepository;
     private QuestionService questionService;
 
     @BeforeEach
     void setUp() {
         groupAccessGuard = mock(GroupAccessGuard.class);
+        groupMemberRepository = mock(GroupMemberRepository.class);
         questionRepository = mock(QuestionRepository.class);
         groupDailyQuestionRepository = mock(GroupDailyQuestionRepository.class);
-        questionService = new QuestionService(groupAccessGuard, questionRepository, groupDailyQuestionRepository);
+        dailyAnswerRepository = mock(DailyAnswerRepository.class);
+        questionService = new QuestionService(
+                groupAccessGuard, groupMemberRepository, questionRepository,
+                groupDailyQuestionRepository, dailyAnswerRepository);
     }
 
     @Test
@@ -206,6 +219,107 @@ class QuestionServiceTest {
         DailyQuestionResponse response = questionService.getDailyQuestion(USER_ID, groupId);
 
         assertThat(response.questionId()).isEqualTo(11L);
+    }
+
+    @Test
+    void 미답변_그룹의_질문만_모아서_반환한다() {
+        GroupTheme theme = themeWithId(1L, "FAMILY");
+        PrivateGroup answeredGroup = activeGroupWithTheme(1L, theme);
+        PrivateGroup unansweredGroup = activeGroupWithTheme(2L, theme);
+        Question answeredQuestion = questionWithId(10L, "이미 답변한 질문", 1);
+        Question unansweredQuestion = questionWithId(11L, "아직 답변 안 한 질문", 1);
+        GroupDailyQuestion answeredDaily = dailyQuestionWithId(100L, answeredQuestion, LocalDate.now());
+        GroupDailyQuestion unansweredDaily = dailyQuestionWithId(101L, unansweredQuestion, LocalDate.now());
+
+        given(groupMemberRepository.findActiveMembershipsWithGroup(USER_ID))
+                .willReturn(List.of(membershipOf(answeredGroup), membershipOf(unansweredGroup)));
+        given(groupDailyQuestionRepository.findByGroupIdAndServiceDate(eq(1L), any()))
+                .willReturn(Optional.of(answeredDaily));
+        given(groupDailyQuestionRepository.findByGroupIdAndServiceDate(eq(2L), any()))
+                .willReturn(Optional.of(unansweredDaily));
+        given(dailyAnswerRepository.existsByGroupDailyQuestion_IdAndUser_IdAndStatus(
+                100L, USER_ID, AnswerUploadStatus.UPLOADED)).willReturn(true);
+        given(dailyAnswerRepository.existsByGroupDailyQuestion_IdAndUser_IdAndStatus(
+                101L, USER_ID, AnswerUploadStatus.UPLOADED)).willReturn(false);
+
+        List<UnansweredQuestionResponse> result = questionService.getUnansweredQuestions(USER_ID);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).groupId()).isEqualTo(2L);
+        assertThat(result.get(0).questionId()).isEqualTo(11L);
+    }
+
+    @Test
+    void 오늘의_질문이_배정_안_된_그룹은_이_시점에_배정한_뒤_포함한다() {
+        GroupTheme theme = themeWithId(1L, "FAMILY");
+        PrivateGroup group = activeGroupWithTheme(1L, theme);
+        Question onlyCandidate = questionWithId(10L, "새로 배정될 질문", 0);
+
+        given(groupMemberRepository.findActiveMembershipsWithGroup(USER_ID))
+                .willReturn(List.of(membershipOf(group)));
+        given(groupDailyQuestionRepository.findByGroupIdAndServiceDate(eq(1L), any()))
+                .willReturn(Optional.empty());
+        given(questionRepository.findByThemeIdAndStatus(1L, QuestionStatus.ACTIVE))
+                .willReturn(List.of(onlyCandidate));
+        given(groupDailyQuestionRepository.findLastShownDatesByGroupId(1L))
+                .willReturn(List.of());
+        given(groupDailyQuestionRepository.save(any(GroupDailyQuestion.class)))
+                .willAnswer(invocation -> {
+                    GroupDailyQuestion saved = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(saved, "id", 200L);
+                    return saved;
+                });
+        given(dailyAnswerRepository.existsByGroupDailyQuestion_IdAndUser_IdAndStatus(
+                200L, USER_ID, AnswerUploadStatus.UPLOADED)).willReturn(false);
+
+        List<UnansweredQuestionResponse> result = questionService.getUnansweredQuestions(USER_ID);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).questionId()).isEqualTo(10L);
+        verify(groupDailyQuestionRepository).save(any(GroupDailyQuestion.class));
+    }
+
+    @Test
+    void 배정에_실패한_그룹은_제외하고_나머지_그룹은_정상_반환한다() {
+        PrivateGroup brokenGroup = activeGroupWithTheme(1L, null);
+        GroupTheme theme = themeWithId(2L, "FRIEND");
+        PrivateGroup okGroup = activeGroupWithTheme(2L, theme);
+        Question question = questionWithId(10L, "정상 그룹 질문", 0);
+        GroupDailyQuestion okDaily = dailyQuestionWithId(100L, question, LocalDate.now());
+
+        given(groupMemberRepository.findActiveMembershipsWithGroup(USER_ID))
+                .willReturn(List.of(membershipOf(brokenGroup), membershipOf(okGroup)));
+        given(groupDailyQuestionRepository.findByGroupIdAndServiceDate(eq(1L), any()))
+                .willReturn(Optional.empty());
+        given(groupDailyQuestionRepository.findByGroupIdAndServiceDate(eq(2L), any()))
+                .willReturn(Optional.of(okDaily));
+        given(dailyAnswerRepository.existsByGroupDailyQuestion_IdAndUser_IdAndStatus(
+                100L, USER_ID, AnswerUploadStatus.UPLOADED)).willReturn(false);
+
+        List<UnansweredQuestionResponse> result = questionService.getUnansweredQuestions(USER_ID);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).groupId()).isEqualTo(2L);
+    }
+
+    @Test
+    void 속한_그룹이_없으면_빈_목록을_반환한다() {
+        given(groupMemberRepository.findActiveMembershipsWithGroup(USER_ID)).willReturn(List.of());
+
+        List<UnansweredQuestionResponse> result = questionService.getUnansweredQuestions(USER_ID);
+
+        assertThat(result).isEmpty();
+        verifyNoInteractions(dailyAnswerRepository);
+    }
+
+    private GroupMember membershipOf(PrivateGroup group) {
+        GroupMember member = GroupMember.builder()
+                .group(group)
+                .role(GroupMemberRole.MEMBER)
+                .status(MemberStatus.ACTIVE)
+                .joinedAt(LocalDateTime.now())
+                .build();
+        return member;
     }
 
     private Question questionWithId(Long id, String content, int useCount) {
