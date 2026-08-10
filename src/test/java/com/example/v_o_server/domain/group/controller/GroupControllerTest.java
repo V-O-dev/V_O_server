@@ -278,6 +278,17 @@ class GroupControllerTest {
     }
 
     @Test
+    @DisplayName("호칭 앞뒤에 공백이 섞이면 C001 — 전역 닉네임과 같은 규칙")
+    void rejectsPaddedAlias() throws Exception {
+        mockMvc.perform(put("/api/v1/groups/100/members/10/alias")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"alias\":\" 엄마 \"}")
+                        .with(authUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("C001"));
+    }
+
+    @Test
     @DisplayName("호칭에 이모지가 있으면 C001")
     void rejectsEmojiAlias() throws Exception {
         mockMvc.perform(put("/api/v1/groups/100/members/10/alias")
@@ -289,14 +300,32 @@ class GroupControllerTest {
     }
 
     @Test
-    @DisplayName("호칭이 공백뿐이면 C001")
-    void rejectsBlankAlias() throws Exception {
+    @DisplayName("호칭을 공백으로 저장하면 오류가 아니라 해제로 처리한다 (GRP_MNG_03 롤백 규칙)")
+    void blankAliasIsAcceptedAsClear() throws Exception {
+        given(groupMemberAliasService.upsertAlias(AUTH_USER_ID, 100L, 10L, "   "))
+                .willReturn(memberView(10L, 3L, GroupMemberRole.OWNER, "김유진", null, false));
+
         mockMvc.perform(put("/api/v1/groups/100/members/10/alias")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"alias\":\"   \"}")
                         .with(authUser()))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("C001"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.alias").doesNotExist())
+                .andExpect(jsonPath("$.data.displayName").value("김유진"));
+    }
+
+    @Test
+    @DisplayName("alias 필드를 아예 생략해도 해제로 처리한다")
+    void missingAliasFieldIsAcceptedAsClear() throws Exception {
+        given(groupMemberAliasService.upsertAlias(AUTH_USER_ID, 100L, 10L, null))
+                .willReturn(memberView(10L, 3L, GroupMemberRole.OWNER, "김유진", null, false));
+
+        mockMvc.perform(put("/api/v1/groups/100/members/10/alias")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}")
+                        .with(authUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.displayName").value("김유진"));
     }
 
     @Test

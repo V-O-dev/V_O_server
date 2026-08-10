@@ -120,6 +120,59 @@ class GroupMemberAliasServiceTest {
         }
 
         @Test
+        @DisplayName("공백만 보내면 저장이 아니라 해제로 처리한다 — 원래 이름으로 롤백 (GRP_MNG_03)")
+        void blankAliasClearsInsteadOfSaving() {
+            givenTargetIsActiveMember();
+            given(viewAssembler.assembleOne(eq(GROUP_ID), eq(VIEWER_ID), any()))
+                    .willReturn(GroupMemberResponse.of(targetMember(), "홍길동", null, null, "홍길동", false));
+
+            GroupMemberResponse result = service.upsertAlias(VIEWER_ID, GROUP_ID, TARGET_MEMBER_ID, "   ");
+
+            verify(groupMemberAliasRepository).deleteAlias(GROUP_ID, VIEWER_ID, TARGET_ID);
+            verify(groupMemberAliasRepository, never()).upsertAlias(any(), any(), any(), any());
+            assertThat(result.alias()).isNull();
+            assertThat(result.displayName()).isEqualTo("홍길동");
+        }
+
+        @Test
+        @DisplayName("빈 문자열도 해제로 처리한다")
+        void emptyAliasClears() {
+            givenTargetIsActiveMember();
+            given(viewAssembler.assembleOne(eq(GROUP_ID), eq(VIEWER_ID), any()))
+                    .willReturn(GroupMemberResponse.of(targetMember(), "홍길동", null, null, "홍길동", false));
+
+            service.upsertAlias(VIEWER_ID, GROUP_ID, TARGET_MEMBER_ID, "");
+
+            verify(groupMemberAliasRepository).deleteAlias(GROUP_ID, VIEWER_ID, TARGET_ID);
+        }
+
+        @Test
+        @DisplayName("null도 해제로 처리한다")
+        void nullAliasClears() {
+            givenTargetIsActiveMember();
+            given(viewAssembler.assembleOne(eq(GROUP_ID), eq(VIEWER_ID), any()))
+                    .willReturn(GroupMemberResponse.of(targetMember(), "홍길동", null, null, "홍길동", false));
+
+            service.upsertAlias(VIEWER_ID, GROUP_ID, TARGET_MEMBER_ID, null);
+
+            verify(groupMemberAliasRepository).deleteAlias(GROUP_ID, VIEWER_ID, TARGET_ID);
+        }
+
+        @Test
+        @DisplayName("공백 해제도 대상 검증을 먼저 거친다 — 자기 자신이면 G017")
+        void blankAliasStillValidatesTarget() {
+            given(groupMemberRepository.findByIdAndGroupIdAndStatus(
+                    MY_MEMBER_ID, GROUP_ID, MemberStatus.ACTIVE))
+                    .willReturn(Optional.of(
+                            member(MY_MEMBER_ID, group, viewer, GroupMemberRole.OWNER, MemberStatus.ACTIVE)));
+
+            assertThatThrownBy(() -> service.upsertAlias(VIEWER_ID, GROUP_ID, MY_MEMBER_ID, "  "))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ALIAS_SELF_NOT_ALLOWED);
+            verify(groupMemberAliasRepository, never()).deleteAlias(any(), any(), any());
+        }
+
+        @Test
         @DisplayName("자기 자신에게 지정하면 G017")
         void rejectsSelfAlias() {
             given(groupMemberRepository.findByIdAndGroupIdAndStatus(

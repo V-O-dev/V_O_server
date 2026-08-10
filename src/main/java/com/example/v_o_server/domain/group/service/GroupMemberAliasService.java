@@ -35,15 +35,26 @@ public class GroupMemberAliasService {
         return viewAssembler.assembleActiveMembers(groupId, viewerUserId);
     }
 
-    /** 호칭 설정·변경 (멱등 upsert). */
+    /**
+     * 호칭 설정·변경 (멱등 upsert).
+     *
+     * <p>{@code alias}가 비어 있으면 저장이 아니라 <b>해제</b>다 — 화면 정의서 GRP_MNG_03의
+     * "공백 상태로 저장 시 원래 이름으로 롤백 처리". 전체 삭제(X)로 비우고 저장 버튼을 누르는 흐름이
+     * 오류 없이 원래 이름으로 돌아가야 한다.</p>
+     */
     @Transactional
     public GroupMemberResponse upsertAlias(Long viewerUserId, Long groupId, Long memberId, String alias) {
         GroupMember targetMember = resolveTargetMember(viewerUserId, groupId, memberId);
+        Long targetUserId = targetMember.getUser().getId();
 
-        groupMemberAliasRepository.upsertAlias(
-                groupId, viewerUserId, targetMember.getUser().getId(), alias);
+        // 앞뒤 공백이 섞인 값은 요청 DTO의 @Pattern에서 이미 걸러진다. 여기서는 "비었는가"만 본다.
+        if (alias == null || alias.isBlank()) {
+            groupMemberAliasRepository.deleteAlias(groupId, viewerUserId, targetUserId);
+        } else {
+            groupMemberAliasRepository.upsertAlias(groupId, viewerUserId, targetUserId, alias);
+        }
 
-        // upsert가 clearAutomatically로 영속성 컨텍스트를 비우므로 targetMember는 준영속이 된다.
+        // 쓰기 쿼리가 clearAutomatically로 영속성 컨텍스트를 비우므로 targetMember는 준영속이 된다.
         // 조립기가 이 엔티티에서 읽는 값은 이미 로딩된 스칼라(id·role·joinedAt)와 프록시의 식별자뿐이라
         // 추가 초기화가 일어나지 않는다. 호칭·프로필은 조립기가 새로 조회하므로 방금 쓴 값이 반영된다.
         return viewAssembler.assembleOne(groupId, viewerUserId, targetMember);

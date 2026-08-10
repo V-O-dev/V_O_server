@@ -20,6 +20,7 @@ import com.example.v_o_server.domain.feed.repository.FeedCountProjection;
 import com.example.v_o_server.domain.feed.repository.FeedReactionQueryRepository;
 import com.example.v_o_server.domain.group.service.GroupAccessGuard;
 import com.example.v_o_server.domain.group.service.GroupMemberAliasReader;
+import com.example.v_o_server.domain.group.service.GroupMemberIdResolver;
 import com.example.v_o_server.domain.question.entity.Question;
 import com.example.v_o_server.domain.question.entity.QuestionStatus;
 import com.example.v_o_server.domain.user.entity.User;
@@ -54,6 +55,7 @@ class FeedServiceTest {
     private FeedReactionQueryRepository feedReactionQueryRepository;
     private FeedCommentQueryRepository feedCommentQueryRepository;
     private GroupMemberAliasReader aliasReader;
+    private GroupMemberIdResolver memberIdResolver;
     private FeedService feedService;
 
     @BeforeEach
@@ -66,6 +68,8 @@ class FeedServiceTest {
         feedCommentQueryRepository = org.mockito.Mockito.mock(FeedCommentQueryRepository.class);
         aliasReader = org.mockito.Mockito.mock(GroupMemberAliasReader.class);
         given(aliasReader.findAliases(any(), any(), any())).willReturn(Map.of());
+        memberIdResolver = org.mockito.Mockito.mock(GroupMemberIdResolver.class);
+        given(memberIdResolver.findMemberIds(any(), any())).willReturn(Map.of());
         feedService = new FeedService(
                 groupAccessGuard,
                 dailyAnswerRepository,
@@ -73,7 +77,8 @@ class FeedServiceTest {
                 userProfileRepository,
                 feedReactionQueryRepository,
                 feedCommentQueryRepository,
-                aliasReader
+                aliasReader,
+                memberIdResolver
         );
     }
 
@@ -202,6 +207,58 @@ class FeedServiceTest {
                 ArgumentCaptor.forClass(java.util.Collection.class);
         verify(aliasReader).findAliases(eq(GROUP_ID), eq(USER_ID), captor.capture());
         assertThat(captor.getValue()).containsExactly(2L);
+    }
+
+    @Test
+    @DisplayName("피드 카드에 작성자의 memberId를 실어 호칭 편집 화면으로 바로 갈 수 있게 한다")
+    void carriesMemberIdSoClientCanOpenAliasEditor() {
+        givenSingleVideoFeed(profile(user(2L), "동구", null));
+        given(memberIdResolver.findMemberIds(eq(GROUP_ID), any())).willReturn(Map.of(2L, 21L));
+
+        FeedResponse response = feedService.getFeed(USER_ID, GROUP_ID, SERVICE_DATE, 0, 2);
+
+        assertThat(response.items()).singleElement()
+                .satisfies(item -> assertThat(item.memberId()).isEqualTo(21L));
+        verify(memberIdResolver).findMemberIds(eq(GROUP_ID), any());
+    }
+
+    @Test
+    @DisplayName("내 영상에는 memberId를 내리지 않는다 — 자기 자신에게는 호칭을 지정할 수 없다")
+    void memberIdIsNullForMyOwnVideo() {
+        User me = user(USER_ID);
+        Video myVideo = video(100L, me, question(30L, "오늘 가장 웃겼던 일은?"),
+                LocalDateTime.of(2026, 7, 24, 12, 0));
+
+        given(dailyAnswerRepository.findByGroupIdAndUserIdAndServiceDate(GROUP_ID, USER_ID, SERVICE_DATE))
+                .willReturn(Optional.of(answer(AnswerUploadStatus.UPLOADED)));
+        given(videoRepository.findByGroupIdAndDailyAnswerServiceDateAndStatus(
+                eq(GROUP_ID), eq(SERVICE_DATE), eq(VideoStatus.ACTIVE), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(myVideo), PageRequest.of(0, 2), 1));
+        given(userProfileRepository.findAllById(any())).willReturn(List.of());
+        given(feedReactionQueryRepository.countByVideoIds(List.of(100L))).willReturn(List.of());
+        given(feedReactionQueryRepository.findReactedVideoIds(USER_ID, List.of(100L))).willReturn(List.of());
+        given(feedCommentQueryRepository.countActiveByVideoIds(List.of(100L))).willReturn(List.of());
+        // 리졸버가 내 멤버십을 돌려주더라도 응답에는 실리지 않아야 한다.
+        given(memberIdResolver.findMemberIds(eq(GROUP_ID), any())).willReturn(Map.of(USER_ID, 99L));
+
+        FeedResponse response = feedService.getFeed(USER_ID, GROUP_ID, SERVICE_DATE, 0, 2);
+
+        assertThat(response.items()).singleElement().satisfies(item -> {
+            assertThat(item.userId()).isEqualTo(USER_ID);
+            assertThat(item.memberId()).isNull();
+        });
+    }
+
+    @Test
+    @DisplayName("영상을 남기고 그룹을 나간 작성자는 memberId가 null이다 — 호칭을 지정할 수 없다")
+    void memberIdIsNullForAuthorWhoLeftTheGroup() {
+        givenSingleVideoFeed(profile(user(2L), "동구", null));
+        given(memberIdResolver.findMemberIds(eq(GROUP_ID), any())).willReturn(Map.of());
+
+        FeedResponse response = feedService.getFeed(USER_ID, GROUP_ID, SERVICE_DATE, 0, 2);
+
+        assertThat(response.items()).singleElement()
+                .satisfies(item -> assertThat(item.memberId()).isNull());
     }
 
     @Test

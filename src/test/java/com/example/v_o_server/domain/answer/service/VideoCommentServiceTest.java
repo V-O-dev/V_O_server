@@ -22,6 +22,7 @@ import com.example.v_o_server.domain.answer.repository.VideoCommentRepository;
 import com.example.v_o_server.domain.answer.repository.VideoRepository;
 import com.example.v_o_server.domain.group.entity.PrivateGroup;
 import com.example.v_o_server.domain.group.service.GroupMemberAliasReader;
+import com.example.v_o_server.domain.group.service.GroupMemberIdResolver;
 import com.example.v_o_server.domain.user.entity.User;
 import com.example.v_o_server.domain.user.entity.UserProfile;
 import com.example.v_o_server.domain.user.repository.UserProfileRepository;
@@ -68,6 +69,9 @@ class VideoCommentServiceTest {
     @Mock
     private GroupMemberAliasReader aliasReader;
 
+    @Mock
+    private GroupMemberIdResolver memberIdResolver;
+
     @InjectMocks
     private VideoCommentService videoCommentService;
 
@@ -79,6 +83,7 @@ class VideoCommentServiceTest {
         given(video.getGroup()).willReturn(group);
         given(videoRepository.findByIdAndStatus(VIDEO_ID, VideoStatus.ACTIVE)).willReturn(Optional.of(video));
         given(aliasReader.findAliases(eq(GROUP_ID), anyLong(), any())).willReturn(Map.of());
+        given(memberIdResolver.findMemberIds(eq(GROUP_ID), any())).willReturn(Map.of());
         return video;
     }
 
@@ -159,7 +164,69 @@ class VideoCommentServiceTest {
     }
 
     @Test
-    @DisplayName("댓글 등록 - 본인 댓글이므로 표시 이름은 항상 내 닉네임이다")
+    @DisplayName("댓글 목록 조회 - 작성자의 memberId를 실어 호칭 편집 화면으로 갈 수 있게 한다")
+    void getComments_carriesMemberId() {
+        Video video = activeVideo();
+        given(feedAccessPolicy.canAccess(USER_ID, video)).willReturn(true);
+
+        VideoComment comment = commentBy(OTHER_USER_ID);
+        given(comment.getId()).willReturn(COMMENT_ID);
+        given(comment.getContent()).willReturn("허허허");
+        given(videoCommentRepository.findByVideo_IdAndIsDeletedFalseAndIdGreaterThanOrderByIdAsc(
+                eq(VIDEO_ID), eq(0L), any(Pageable.class))).willReturn(List.of(comment));
+        given(userProfileRepository.findAllById(List.of(OTHER_USER_ID))).willReturn(List.of());
+        given(memberIdResolver.findMemberIds(GROUP_ID, List.of(OTHER_USER_ID)))
+                .willReturn(Map.of(OTHER_USER_ID, 33L));
+
+        CommentListResponse response = videoCommentService.getComments(USER_ID, VIDEO_ID, null);
+
+        assertThat(response.comments().get(0).writer().memberId()).isEqualTo(33L);
+        verify(memberIdResolver).findMemberIds(GROUP_ID, List.of(OTHER_USER_ID));
+    }
+
+    @Test
+    @DisplayName("댓글 목록 조회 - 내가 예전에 쓴 댓글에는 memberId를 내리지 않는다")
+    void getComments_memberIdIsNullForMyOwnComment() {
+        Video video = activeVideo();
+        given(feedAccessPolicy.canAccess(USER_ID, video)).willReturn(true);
+
+        VideoComment myComment = commentBy(USER_ID);
+        given(myComment.getId()).willReturn(COMMENT_ID);
+        given(myComment.getContent()).willReturn("오늘 정말 좋았어");
+        given(videoCommentRepository.findByVideo_IdAndIsDeletedFalseAndIdGreaterThanOrderByIdAsc(
+                eq(VIDEO_ID), eq(0L), any(Pageable.class))).willReturn(List.of(myComment));
+        given(userProfileRepository.findAllById(List.of(USER_ID))).willReturn(List.of());
+        // 리졸버가 내 멤버십을 돌려주더라도 응답에는 실리지 않아야 한다.
+        given(memberIdResolver.findMemberIds(GROUP_ID, List.of(USER_ID))).willReturn(Map.of(USER_ID, 99L));
+
+        CommentListResponse response = videoCommentService.getComments(USER_ID, VIDEO_ID, null);
+
+        CommentResponse first = response.comments().get(0);
+        assertThat(first.isMine()).isTrue();
+        assertThat(first.writer().memberId()).isNull();
+    }
+
+    @Test
+    @DisplayName("댓글 목록 조회 - 댓글 남기고 나간 작성자는 memberId가 null이다")
+    void getComments_memberIdIsNullForFormerMember() {
+        Video video = activeVideo();
+        given(feedAccessPolicy.canAccess(USER_ID, video)).willReturn(true);
+
+        VideoComment comment = commentBy(OTHER_USER_ID);
+        given(comment.getId()).willReturn(COMMENT_ID);
+        given(comment.getContent()).willReturn("허허허");
+        given(videoCommentRepository.findByVideo_IdAndIsDeletedFalseAndIdGreaterThanOrderByIdAsc(
+                eq(VIDEO_ID), eq(0L), any(Pageable.class))).willReturn(List.of(comment));
+        given(userProfileRepository.findAllById(List.of(OTHER_USER_ID))).willReturn(List.of());
+        given(memberIdResolver.findMemberIds(GROUP_ID, List.of(OTHER_USER_ID))).willReturn(Map.of());
+
+        CommentListResponse response = videoCommentService.getComments(USER_ID, VIDEO_ID, null);
+
+        assertThat(response.comments().get(0).writer().memberId()).isNull();
+    }
+
+    @Test
+    @DisplayName("댓글 등록 - 본인 댓글이므로 표시 이름은 항상 내 닉네임이고 memberId는 없다")
     void createComment_displayNameIsAlwaysOwnNickname() {
         Video video = activeVideo();
         given(feedAccessPolicy.canAccess(USER_ID, video)).willReturn(true);
@@ -179,6 +246,8 @@ class VideoCommentServiceTest {
 
         assertThat(response.writer().nickname()).isEqualTo("나");
         assertThat(response.writer().displayName()).isEqualTo("나");
+        // 자기 자신에게는 호칭을 지정할 수 없으므로 편집 진입용 memberId도 내리지 않는다.
+        assertThat(response.writer().memberId()).isNull();
         assertThat(response.isMine()).isTrue();
     }
 

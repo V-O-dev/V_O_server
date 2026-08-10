@@ -13,6 +13,7 @@ import com.example.v_o_server.domain.feed.repository.FeedCountProjection;
 import com.example.v_o_server.domain.feed.repository.FeedReactionQueryRepository;
 import com.example.v_o_server.domain.group.service.GroupAccessGuard;
 import com.example.v_o_server.domain.group.service.GroupMemberAliasReader;
+import com.example.v_o_server.domain.group.service.GroupMemberIdResolver;
 import com.example.v_o_server.domain.user.entity.UserProfile;
 import com.example.v_o_server.domain.user.repository.UserProfileRepository;
 import java.time.LocalDate;
@@ -40,6 +41,7 @@ public class FeedService {
     private final FeedReactionQueryRepository feedReactionQueryRepository;
     private final FeedCommentQueryRepository feedCommentQueryRepository;
     private final GroupMemberAliasReader aliasReader;
+    private final GroupMemberIdResolver memberIdResolver;
 
     public FeedResponse getFeed(
             Long userId,
@@ -93,12 +95,17 @@ public class FeedService {
         // 호칭은 보는 사람 기준이라 뷰어(userId)와 이 그룹으로 한정해 한 번에 읽는다.
         // 프로필이 없는 작성자에게도 호칭은 붙을 수 있으므로 프로필 맵이 아니라 작성자 전체 집합으로 조회한다.
         Map<Long, String> aliases = aliasReader.findAliases(groupId, userId, authorIds);
+        // 피드 카드에서 바로 호칭 편집 화면으로 갈 수 있도록 멤버 ID를 함께 내려준다(FED_BLR_01).
+        Map<Long, Long> memberIds = memberIdResolver.findMemberIds(groupId, authorIds);
 
         Page<FeedItemResponse> items = videos.map(video ->
                 toFeedItem(
                         video,
                         profilesByUserId.get(video.getUser().getId()),
                         aliases.get(video.getUser().getId()),
+                        // 내 영상에는 편집 진입용 memberId를 내리지 않는다 — 자기 자신에게는 호칭을 지정할 수 없다(G017).
+                        userId.equals(video.getUser().getId())
+                                ? null : memberIds.get(video.getUser().getId()),
                         reactionCounts.getOrDefault(video.getId(), 0L),
                         reactedVideoIds.contains(video.getId()),
                         commentCounts.getOrDefault(video.getId(), 0L)
@@ -117,6 +124,7 @@ public class FeedService {
             Video video,
             UserProfile profile,
             String alias,
+            Long memberId,
             long reactionCount,
             boolean reactedByMe,
             long commentCount
@@ -125,6 +133,7 @@ public class FeedService {
         return new FeedItemResponse(
                 video.getId(),
                 video.getUser().getId(),
+                memberId,
                 nickname,
                 GroupMemberAliasReader.resolveDisplayName(alias, nickname),
                 profile == null ? null : profile.getProfileImageUrl(),
