@@ -10,8 +10,10 @@ import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.mapping.Column;
 import org.hibernate.mapping.PersistentClass;
 import org.hibernate.mapping.Selectable;
+import org.hibernate.mapping.Table;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -35,7 +37,8 @@ class ErdColumnAlignmentTest {
                 .build());
         List.of(
                 com.example.v_o_server.domain.user.entity.User.class,
-                PrivateGroup.class, GroupMember.class, GroupTheme.class, GroupInvite.class,
+                PrivateGroup.class, GroupMember.class, GroupMemberAlias.class, GroupTheme.class,
+                GroupInvite.class,
                 com.example.v_o_server.domain.question.entity.Question.class,
                 com.example.v_o_server.domain.question.entity.GroupDailyQuestion.class,
                 com.example.v_o_server.domain.answer.entity.DailyAnswer.class,
@@ -63,6 +66,8 @@ class ErdColumnAlignmentTest {
             // group_members
             "GroupMember, role, 20",
             "GroupMember, status, 30",
+            // group_member_aliases
+            "GroupMemberAlias, alias, 15",
             // group_themes
             "GroupTheme, code, 40",
             "GroupTheme, name, 80",
@@ -99,6 +104,7 @@ class ErdColumnAlignmentTest {
             "GroupMember, joinedAt, false",
             "GroupMember, leftAt, true",
             "GroupMember, kickedBy, true",
+            "GroupMemberAlias, alias, false",
             "GroupTheme, code, false",
             "GroupTheme, name, false",
             "GroupTheme, sortOrder, false",
@@ -132,6 +138,9 @@ class ErdColumnAlignmentTest {
             "PrivateGroup, theme, false",
             "GroupMember, group, false",
             "GroupMember, user, false",
+            "GroupMemberAlias, group, false",
+            "GroupMemberAlias, viewer, false",
+            "GroupMemberAlias, target, false",
             "GroupInvite, group, false",
             "GroupInvite, createdBy, false",
             "ArchiveEntry, user, false",
@@ -159,10 +168,33 @@ class ErdColumnAlignmentTest {
                 .isTrue();
     }
 
+    /**
+     * {@code group_member_aliases}의 복합 UNIQUE는 호칭 upsert의 전제다.
+     *
+     * <p>리포지토리의 {@code insert ... on conflict (group_id, viewer_user_id, target_user_id)}는
+     * 이 유니크 인덱스가 없으면 런타임 오류가 난다. 여기서는 Hibernate 매핑 모델에 제약이 선언됐는지만
+     * 확인한다 — 실제 PostgreSQL 인덱스 생성 여부는 {@code pg_indexes} 조회로 별도 확인해야 한다.</p>
+     */
+    @Test
+    @DisplayName("group_member_aliases에 (group_id, viewer_user_id, target_user_id) 복합 UNIQUE가 있다")
+    void groupMemberAliasHasCompositeUniqueConstraint() {
+        Table table = metadata.getEntityBinding(GroupMemberAlias.class.getName()).getTable();
+
+        List<List<String>> uniqueKeyColumns = table.getUniqueKeys().values().stream()
+                .map(key -> key.getColumns().stream().map(Column::getName).toList())
+                .toList();
+
+        assertThat(uniqueKeyColumns)
+                .as("group_member_aliases의 복합 UNIQUE 제약")
+                .anySatisfy(columns -> assertThat(columns)
+                        .containsExactlyInAnyOrder("group_id", "viewer_user_id", "target_user_id"));
+    }
+
     private static Class<?> entityFor(String simpleName) {
         return switch (simpleName) {
             case "PrivateGroup" -> PrivateGroup.class;
             case "GroupMember" -> GroupMember.class;
+            case "GroupMemberAlias" -> GroupMemberAlias.class;
             case "GroupTheme" -> GroupTheme.class;
             case "GroupInvite" -> GroupInvite.class;
             case "ArchiveEntry" -> ArchiveEntry.class;

@@ -8,7 +8,10 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static com.example.v_o_server.domain.group.GroupTestFixtures.group;
+import static com.example.v_o_server.domain.group.GroupTestFixtures.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -16,10 +19,15 @@ import com.example.v_o_server.common.exception.BusinessException;
 import com.example.v_o_server.common.exception.ErrorCode;
 import com.example.v_o_server.common.security.JwtAuthenticationFilter;
 import com.example.v_o_server.config.SecurityConfig;
+import com.example.v_o_server.domain.group.dto.GroupDetailResponse;
+import com.example.v_o_server.domain.group.dto.GroupMemberResponse;
 import com.example.v_o_server.domain.group.dto.GroupNameDuplicateResponse;
+import com.example.v_o_server.domain.group.entity.GroupMemberRole;
 import com.example.v_o_server.domain.group.service.GroupInviteService;
+import com.example.v_o_server.domain.group.service.GroupMemberAliasService;
 import com.example.v_o_server.domain.group.service.GroupMemberService;
 import com.example.v_o_server.domain.group.service.GroupService;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -89,6 +97,8 @@ class GroupControllerTest {
     private GroupInviteService groupInviteService;
     @MockitoBean
     private GroupMemberService groupMemberService;
+    @MockitoBean
+    private GroupMemberAliasService groupMemberAliasService;
 
     @Test
     @DisplayName("그룹명 중복 확인은 duplicated 값을 반환한다")
@@ -210,5 +220,149 @@ class GroupControllerTest {
         mockMvc.perform(get("/api/v1/groups/100").with(authUser()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("G003"));
+    }
+
+    /* -------------------- 멤버 목록 · 호칭 -------------------- */
+
+    private GroupMemberResponse memberView(Long memberId, Long userId, GroupMemberRole role,
+                                           String nickname, String alias, boolean isMe) {
+        return new GroupMemberResponse(memberId, userId, role,
+                LocalDateTime.of(2026, 8, 1, 9, 12), nickname,
+                "https://cdn.example.com/p.jpg", alias,
+                alias != null ? alias : nickname, isMe);
+    }
+
+    @Test
+    @DisplayName("멤버 목록은 이름·프로필·호칭·본인 여부를 함께 반환한다")
+    void getMembers() throws Exception {
+        given(groupMemberAliasService.getMembers(AUTH_USER_ID, 100L)).willReturn(List.of(
+                memberView(10L, 3L, GroupMemberRole.OWNER, "김유진", "엄마", false),
+                memberView(11L, 1L, GroupMemberRole.MEMBER, "박서준", null, true)));
+
+        mockMvc.perform(get("/api/v1/groups/100/members").with(authUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].memberId").value(10))
+                .andExpect(jsonPath("$.data[0].nickname").value("김유진"))
+                .andExpect(jsonPath("$.data[0].alias").value("엄마"))
+                .andExpect(jsonPath("$.data[0].displayName").value("엄마"))
+                .andExpect(jsonPath("$.data[0].isMe").value(false))
+                .andExpect(jsonPath("$.data[1].alias").doesNotExist())
+                .andExpect(jsonPath("$.data[1].displayName").value("박서준"))
+                .andExpect(jsonPath("$.data[1].isMe").value(true));
+    }
+
+    @Test
+    @DisplayName("호칭 설정은 갱신된 멤버를 반환한다")
+    void upsertAlias() throws Exception {
+        given(groupMemberAliasService.upsertAlias(AUTH_USER_ID, 100L, 10L, "엄마"))
+                .willReturn(memberView(10L, 3L, GroupMemberRole.OWNER, "김유진", "엄마", false));
+
+        mockMvc.perform(put("/api/v1/groups/100/members/10/alias")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"alias\":\"엄마\"}")
+                        .with(authUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.alias").value("엄마"))
+                .andExpect(jsonPath("$.data.displayName").value("엄마"));
+    }
+
+    @Test
+    @DisplayName("호칭이 16자면 C001")
+    void rejectsTooLongAlias() throws Exception {
+        mockMvc.perform(put("/api/v1/groups/100/members/10/alias")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"alias\":\"" + "가".repeat(16) + "\"}")
+                        .with(authUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("C001"));
+    }
+
+    @Test
+    @DisplayName("호칭 앞뒤에 공백이 섞이면 C001 — 전역 닉네임과 같은 규칙")
+    void rejectsPaddedAlias() throws Exception {
+        mockMvc.perform(put("/api/v1/groups/100/members/10/alias")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"alias\":\" 엄마 \"}")
+                        .with(authUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("C001"));
+    }
+
+    @Test
+    @DisplayName("호칭에 이모지가 있으면 C001")
+    void rejectsEmojiAlias() throws Exception {
+        mockMvc.perform(put("/api/v1/groups/100/members/10/alias")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"alias\":\"엄마😀\"}")
+                        .with(authUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("C001"));
+    }
+
+    @Test
+    @DisplayName("호칭을 공백으로 저장하면 오류가 아니라 해제로 처리한다 (GRP_MNG_03 롤백 규칙)")
+    void blankAliasIsAcceptedAsClear() throws Exception {
+        given(groupMemberAliasService.upsertAlias(AUTH_USER_ID, 100L, 10L, "   "))
+                .willReturn(memberView(10L, 3L, GroupMemberRole.OWNER, "김유진", null, false));
+
+        mockMvc.perform(put("/api/v1/groups/100/members/10/alias")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"alias\":\"   \"}")
+                        .with(authUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.alias").doesNotExist())
+                .andExpect(jsonPath("$.data.displayName").value("김유진"));
+    }
+
+    @Test
+    @DisplayName("alias 필드를 아예 생략해도 해제로 처리한다")
+    void missingAliasFieldIsAcceptedAsClear() throws Exception {
+        given(groupMemberAliasService.upsertAlias(AUTH_USER_ID, 100L, 10L, null))
+                .willReturn(memberView(10L, 3L, GroupMemberRole.OWNER, "김유진", null, false));
+
+        mockMvc.perform(put("/api/v1/groups/100/members/10/alias")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}")
+                        .with(authUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.displayName").value("김유진"));
+    }
+
+    @Test
+    @DisplayName("자기 자신에게 호칭을 지정하면 G017")
+    void rejectsSelfAlias() throws Exception {
+        given(groupMemberAliasService.upsertAlias(AUTH_USER_ID, 100L, 11L, "나"))
+                .willThrow(new BusinessException(ErrorCode.ALIAS_SELF_NOT_ALLOWED));
+
+        mockMvc.perform(put("/api/v1/groups/100/members/11/alias")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"alias\":\"나\"}")
+                        .with(authUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("G017"));
+    }
+
+    @Test
+    @DisplayName("호칭 해제는 호칭이 없어도 200")
+    void deleteAliasIsIdempotent() throws Exception {
+        mockMvc.perform(delete("/api/v1/groups/100/members/10/alias").with(authUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(groupMemberAliasService).deleteAlias(AUTH_USER_ID, 100L, 10L);
+    }
+
+    @Test
+    @DisplayName("그룹 상세 응답의 멤버에도 호칭 필드가 직렬화된다")
+    void groupDetailCarriesAliasFields() throws Exception {
+        GroupDetailResponse detail = GroupDetailResponse.of(
+                group(100L, user(1L), 15),
+                List.of(memberView(10L, 3L, GroupMemberRole.OWNER, "김유진", "엄마", false)));
+        given(groupService.getGroupDetail(AUTH_USER_ID, 100L)).willReturn(detail);
+
+        mockMvc.perform(get("/api/v1/groups/100").with(authUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.members[0].alias").value("엄마"))
+                .andExpect(jsonPath("$.data.members[0].displayName").value("엄마"));
     }
 }

@@ -8,11 +8,14 @@ import com.example.v_o_server.domain.group.dto.GroupCreateResponse;
 import com.example.v_o_server.domain.group.dto.GroupDetailResponse;
 import com.example.v_o_server.domain.group.dto.GroupJoinRequest;
 import com.example.v_o_server.domain.group.dto.GroupJoinResponse;
+import com.example.v_o_server.domain.group.dto.GroupMemberAliasRequest;
+import com.example.v_o_server.domain.group.dto.GroupMemberResponse;
 import com.example.v_o_server.domain.group.dto.GroupNameDuplicateResponse;
 import com.example.v_o_server.domain.group.dto.GroupSummaryResponse;
 import com.example.v_o_server.domain.group.dto.InviteCodeResponse;
 import com.example.v_o_server.domain.group.dto.OwnerTransferRequest;
 import com.example.v_o_server.domain.group.service.GroupInviteService;
+import com.example.v_o_server.domain.group.service.GroupMemberAliasService;
 import com.example.v_o_server.domain.group.service.GroupMemberService;
 import com.example.v_o_server.domain.group.service.GroupService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,6 +33,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -45,6 +49,7 @@ public class GroupController {
     private final GroupService groupService;
     private final GroupInviteService groupInviteService;
     private final GroupMemberService groupMemberService;
+    private final GroupMemberAliasService groupMemberAliasService;
 
     @Operation(summary = "그룹 생성", description = "새 그룹을 만들고 생성자를 방장으로 등록합니다.")
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -123,6 +128,39 @@ public class GroupController {
             @AuthenticationPrincipal Long userId,
             @Valid @RequestBody GroupJoinRequest request) {
         return ApiResponse.success(groupInviteService.joinByInviteCode(userId, request.code()));
+    }
+
+    @Operation(summary = "그룹 멤버 목록 조회",
+            description = "그룹 멤버를 이름·프로필 이미지와 함께 조회합니다. 멤버만 조회할 수 있습니다. "
+                    + "내가 지정한 호칭이 있으면 alias/displayName에 반영됩니다. "
+                    + "정렬은 방장 우선 → 가입 순입니다.")
+    @GetMapping("/{groupId}/members")
+    public ApiResponse<List<GroupMemberResponse>> getMembers(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long groupId) {
+        return ApiResponse.success(groupMemberAliasService.getMembers(userId, groupId));
+    }
+
+    @Operation(summary = "멤버 호칭 설정·변경",
+            description = "같은 그룹의 다른 멤버에게 나에게만 보일 호칭을 지정합니다. 처음 설정과 변경이 같은 요청입니다. "
+                    + "설정한 호칭은 다른 그룹원에게 공유되지 않습니다. 자기 자신에게는 지정할 수 없습니다.")
+    @PutMapping("/{groupId}/members/{memberId}/alias")
+    public ApiResponse<GroupMemberResponse> upsertMemberAlias(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long groupId, @PathVariable Long memberId,
+            @Valid @RequestBody GroupMemberAliasRequest request) {
+        return ApiResponse.success(
+                groupMemberAliasService.upsertAlias(userId, groupId, memberId, request.alias()));
+    }
+
+    @Operation(summary = "멤버 호칭 해제",
+            description = "지정한 호칭을 지우고 상대의 원래 이름으로 되돌립니다. 호칭이 없어도 성공합니다.")
+    @DeleteMapping("/{groupId}/members/{memberId}/alias")
+    public ApiResponse<Void> deleteMemberAlias(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long groupId, @PathVariable Long memberId) {
+        groupMemberAliasService.deleteAlias(userId, groupId, memberId);
+        return ApiResponse.ok();
     }
 
     @Operation(summary = "멤버 강제 퇴장", description = "방장이 멤버를 강제 퇴장시킵니다.")

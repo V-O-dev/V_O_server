@@ -67,6 +67,7 @@ public enum ErrorCode {
     GROUP_THEME_NOT_SET(HttpStatus.BAD_REQUEST, "G014", "그룹에 테마가 설정되어 있지 않습니다."),
     KICKED_FROM_GROUP(HttpStatus.FORBIDDEN, "G015", "강제 퇴장된 그룹에는 다시 가입할 수 없습니다."),
     QR_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "G016", "QR 이미지 생성에 실패했습니다."),
+    ALIAS_SELF_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "G017", "내 이름은 프로필 수정에서 변경해주세요."),
 
     // 알림
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "N001", "알림을 찾을 수 없습니다."),

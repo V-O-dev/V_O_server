@@ -3,6 +3,7 @@ package com.example.v_o_server.domain.group.repository;
 import com.example.v_o_server.domain.group.entity.GroupMember;
 import com.example.v_o_server.domain.group.entity.MemberStatus;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -22,6 +23,15 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
     long countByGroupIdAndStatus(Long groupId, MemberStatus status);
 
     List<GroupMember> findByGroupIdAndStatus(Long groupId, MemberStatus status);
+
+    /**
+     * 그룹의 특정 사용자들에 대한 멤버십을 한 번에 조회한다.
+     *
+     * <p>피드·댓글 응답에 {@code memberId}를 실어 주기 위한 것이다 — 호칭 API 경로가
+     * {@code group_members.id}를 요구하므로, 작성자의 userId만으로는 클라이언트가 호출할 수 없다.</p>
+     */
+    List<GroupMember> findByGroupIdAndStatusAndUserIdIn(Long groupId, MemberStatus status,
+                                                        Collection<Long> userIds);
 
     /** 현재 사용자가 ACTIVE 멤버로 속한 그룹의 멤버십 목록 (그룹도 ACTIVE인 것만). */
     @Query("""

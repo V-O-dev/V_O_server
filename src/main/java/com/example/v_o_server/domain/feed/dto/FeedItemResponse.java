@@ -11,8 +11,17 @@ public record FeedItemResponse(
         @Schema(description = "작성자 사용자 ID")
         Long userId,
 
-        @Schema(description = "작성자 닉네임", nullable = true)
+        @Schema(description = "작성자의 그룹 멤버 ID (group_members.id). 호칭 편집 화면으로 이동할 때 쓴다. "
+                + "내 영상이거나 작성 후 그룹을 나간 사람이면 null이며, 이 경우 호칭을 지정할 수 없다.",
+                example = "10", nullable = true)
+        Long memberId,
+
+        @Schema(description = "작성자가 직접 설정한 전역 닉네임", nullable = true)
         String nickname,
+
+        @Schema(description = "화면에 표시할 이름. 내가 이 그룹에서 작성자에게 지정한 호칭이 있으면 그 호칭, 없으면 닉네임",
+                example = "엄마", nullable = true)
+        String displayName,
 
         @Schema(description = "작성자 프로필 이미지 URL", nullable = true)
         String profileImageUrl,
