@@ -44,4 +44,11 @@ class QuestionControllerSecurityTest {
                         .param("groupId", "100"))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    @DisplayName("토큰 없이 답변 대기 중 질문 목록을 호출하면 401")
+    void unansweredQuestionsRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/v1/questions/unanswered"))
+                .andExpect(status().isUnauthorized());
+    }
 }
