@@ -60,6 +60,7 @@ class FeedControllerTest {
                 10L,
                 2L,
                 "동구",
+                "막내",
                 "https://cdn.example.com/profile.jpg",
                 20L,
                 "오늘 가장 웃겼던 일은?",
@@ -94,6 +95,7 @@ class FeedControllerTest {
                 .andExpect(jsonPath("$.data.viewerAnswerStatus").value("UPLOADED"))
                 .andExpect(jsonPath("$.data.items[0].videoId").value(10))
                 .andExpect(jsonPath("$.data.items[0].nickname").value("동구"))
+                .andExpect(jsonPath("$.data.items[0].displayName").value("막내"))
                 .andExpect(jsonPath("$.data.items[0].questionContent")
                         .value("오늘 가장 웃겼던 일은?"))
                 .andExpect(jsonPath("$.data.items[0].reactionCount").value(4))

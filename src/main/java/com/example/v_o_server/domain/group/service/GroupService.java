@@ -48,6 +48,7 @@ public class GroupService {
     private final UserRepository userRepository;
     private final GroupAccessGuard accessGuard;
     private final FileStorageService fileStorageService;
+    private final GroupMemberViewAssembler memberViewAssembler;
 
     /** G1 그룹 생성 (이미지 없음) — JSON 요청 경로. */
     @Transactional
@@ -98,8 +99,8 @@ public class GroupService {
                 .joinedAt(LocalDateTime.now())
                 .build());
 
-        GroupDetailResponse detail =
-                GroupDetailResponse.of(group, List.of(GroupMemberResponse.from(ownerMember)));
+        GroupDetailResponse detail = GroupDetailResponse.of(
+                group, memberViewAssembler.assemble(group.getId(), userId, List.of(ownerMember)));
         return new GroupCreateResponse(group.getId(), detail);
     }
 
@@ -126,11 +127,7 @@ public class GroupService {
         PrivateGroup group = accessGuard.getActiveGroup(groupId);
         accessGuard.assertMember(groupId, userId);
 
-        List<GroupMemberResponse> members =
-                groupMemberRepository.findByGroupIdAndStatus(groupId, MemberStatus.ACTIVE).stream()
-                        .map(GroupMemberResponse::from)
-                        .toList();
-        return GroupDetailResponse.of(group, members);
+        return GroupDetailResponse.of(group, memberViewAssembler.assembleActiveMembers(groupId, userId));
     }
 
     /**
@@ -168,11 +165,7 @@ public class GroupService {
             group.updateImage(stored.url(), stored.objectKey());
         }
 
-        List<GroupMemberResponse> members =
-                groupMemberRepository.findByGroupIdAndStatus(groupId, MemberStatus.ACTIVE).stream()
-                        .map(GroupMemberResponse::from)
-                        .toList();
-        return GroupDetailResponse.of(group, members);
+        return GroupDetailResponse.of(group, memberViewAssembler.assembleActiveMembers(groupId, userId));
     }
 
     /**

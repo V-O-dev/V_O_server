@@ -10,6 +10,7 @@ import com.example.v_o_server.domain.answer.entity.VideoComment;
 import com.example.v_o_server.domain.answer.entity.VideoStatus;
 import com.example.v_o_server.domain.answer.repository.VideoCommentRepository;
 import com.example.v_o_server.domain.answer.repository.VideoRepository;
+import com.example.v_o_server.domain.group.service.GroupMemberAliasReader;
 import com.example.v_o_server.domain.user.entity.User;
 import com.example.v_o_server.domain.user.entity.UserProfile;
 import com.example.v_o_server.domain.user.repository.UserProfileRepository;
@@ -38,6 +39,7 @@ public class VideoCommentService {
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
     private final FeedAccessPolicy feedAccessPolicy;
+    private final GroupMemberAliasReader aliasReader;
 
     public CommentListResponse getComments(Long userId, Long videoId, Long cursor) {
         Video video = getActiveVideo(videoId);
@@ -53,8 +55,13 @@ public class VideoCommentService {
         List<VideoComment> comments = hasNext ? fetched.subList(0, PAGE_SIZE) : fetched;
 
         Map<Long, UserProfile> profiles = loadWriterProfiles(comments);
+        // 호칭은 보는 사람 기준이라 조회자(userId)와 이 영상이 속한 그룹으로 한정해 한 번에 읽는다.
+        // 프로필이 없는 작성자에게도 호칭은 붙을 수 있으므로 프로필 맵이 아니라 작성자 전체 집합으로 조회한다.
+        Map<Long, String> aliases = aliasReader.findAliases(
+                video.getGroup().getId(), userId, writerIdsOf(comments));
+
         List<CommentResponse> responses = comments.stream()
-                .map(comment -> CommentResponse.of(comment, toWriter(comment, profiles), userId))
+                .map(comment -> CommentResponse.of(comment, toWriter(comment, profiles, aliases), userId))
                 .toList();
 
         return new CommentListResponse(responses, hasNext);
@@ -77,9 +84,11 @@ public class VideoCommentService {
                 .isDeleted(false)
                 .build());
 
+        // 본인이 방금 쓴 댓글이다. 자기 자신에게는 호칭을 지정할 수 없으므로 표시 이름은 항상 닉네임이다.
         CommentResponse.Writer writer = userProfileRepository.findById(userId)
-                .map(profile -> new CommentResponse.Writer(userId, profile.getNickname(), profile.getProfileImageUrl()))
-                .orElse(new CommentResponse.Writer(userId, null, null));
+                .map(profile -> CommentResponse.Writer.withoutAlias(
+                        userId, profile.getNickname(), profile.getProfileImageUrl()))
+                .orElse(CommentResponse.Writer.withoutAlias(userId, null, null));
 
         return CommentResponse.of(comment, writer, userId);
     }
@@ -138,21 +147,29 @@ public class VideoCommentService {
         return trimmed;
     }
 
-    private Map<Long, UserProfile> loadWriterProfiles(List<VideoComment> comments) {
-        List<Long> writerIds = comments.stream()
+    private List<Long> writerIdsOf(List<VideoComment> comments) {
+        return comments.stream()
                 .map(comment -> comment.getUser().getId())
                 .distinct()
                 .toList();
-        return userProfileRepository.findAllById(writerIds).stream()
+    }
+
+    private Map<Long, UserProfile> loadWriterProfiles(List<VideoComment> comments) {
+        return userProfileRepository.findAllById(writerIdsOf(comments)).stream()
                 .collect(Collectors.toMap(profile -> profile.getUser().getId(), Function.identity()));
     }
 
-    private CommentResponse.Writer toWriter(VideoComment comment, Map<Long, UserProfile> profiles) {
+    private CommentResponse.Writer toWriter(VideoComment comment, Map<Long, UserProfile> profiles,
+                                            Map<Long, String> aliases) {
         Long writerId = comment.getUser().getId();
         UserProfile profile = profiles.get(writerId);
-        if (profile == null) {
-            return new CommentResponse.Writer(writerId, null, null);
-        }
-        return new CommentResponse.Writer(writerId, profile.getNickname(), profile.getProfileImageUrl());
+        String nickname = profile == null ? null : profile.getNickname();
+        String profileImageUrl = profile == null ? null : profile.getProfileImageUrl();
+        String alias = aliases.get(writerId);
+        return new CommentResponse.Writer(
+                writerId,
+                nickname,
+                GroupMemberAliasReader.resolveDisplayName(alias, nickname),
+                profileImageUrl);
     }
 }

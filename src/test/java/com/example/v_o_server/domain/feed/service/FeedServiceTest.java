@@ -2,6 +2,7 @@ package com.example.v_o_server.domain.feed.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -18,6 +19,7 @@ import com.example.v_o_server.domain.feed.repository.FeedCommentQueryRepository;
 import com.example.v_o_server.domain.feed.repository.FeedCountProjection;
 import com.example.v_o_server.domain.feed.repository.FeedReactionQueryRepository;
 import com.example.v_o_server.domain.group.service.GroupAccessGuard;
+import com.example.v_o_server.domain.group.service.GroupMemberAliasReader;
 import com.example.v_o_server.domain.question.entity.Question;
 import com.example.v_o_server.domain.question.entity.QuestionStatus;
 import com.example.v_o_server.domain.user.entity.User;
@@ -27,6 +29,7 @@ import com.example.v_o_server.domain.user.repository.UserProfileRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -50,6 +53,7 @@ class FeedServiceTest {
     private UserProfileRepository userProfileRepository;
     private FeedReactionQueryRepository feedReactionQueryRepository;
     private FeedCommentQueryRepository feedCommentQueryRepository;
+    private GroupMemberAliasReader aliasReader;
     private FeedService feedService;
 
     @BeforeEach
@@ -60,13 +64,16 @@ class FeedServiceTest {
         userProfileRepository = org.mockito.Mockito.mock(UserProfileRepository.class);
         feedReactionQueryRepository = org.mockito.Mockito.mock(FeedReactionQueryRepository.class);
         feedCommentQueryRepository = org.mockito.Mockito.mock(FeedCommentQueryRepository.class);
+        aliasReader = org.mockito.Mockito.mock(GroupMemberAliasReader.class);
+        given(aliasReader.findAliases(any(), any(), any())).willReturn(Map.of());
         feedService = new FeedService(
                 groupAccessGuard,
                 dailyAnswerRepository,
                 videoRepository,
                 userProfileRepository,
                 feedReactionQueryRepository,
-                feedCommentQueryRepository
+                feedCommentQueryRepository,
+                aliasReader
         );
     }
 
@@ -144,6 +151,8 @@ class FeedServiceTest {
             assertThat(item.videoId()).isEqualTo(100L);
             assertThat(item.userId()).isEqualTo(2L);
             assertThat(item.nickname()).isEqualTo("동구");
+            // 호칭을 지정하지 않았으므로 표시 이름은 전역 닉네임 그대로.
+            assertThat(item.displayName()).isEqualTo("동구");
             assertThat(item.profileImageUrl()).isEqualTo("https://cdn.example.com/profile.jpg");
             assertThat(item.questionId()).isEqualTo(30L);
             assertThat(item.questionContent()).isEqualTo("오늘 가장 웃겼던 일은?");
@@ -163,6 +172,74 @@ class FeedServiceTest {
         );
         assertThat(pageableCaptor.getValue().getSort().getOrderFor("uploadedAt").isDescending()).isTrue();
         assertThat(pageableCaptor.getValue().getSort().getOrderFor("id").isDescending()).isTrue();
+    }
+
+    @Test
+    @DisplayName("내가 지정한 호칭이 있으면 피드 카드 이름이 호칭으로 나온다 (닉네임은 그대로 유지)")
+    void appliesViewerAliasToFeedItem() {
+        User author = givenSingleVideoFeed(profile(user(2L), "동구", "https://cdn.example.com/profile.jpg"));
+        given(aliasReader.findAliases(eq(GROUP_ID), eq(USER_ID), any())).willReturn(Map.of(2L, "막내"));
+
+        FeedResponse response = feedService.getFeed(USER_ID, GROUP_ID, SERVICE_DATE, 0, 2);
+
+        assertThat(response.items()).singleElement().satisfies(item -> {
+            assertThat(item.displayName()).isEqualTo("막내");
+            assertThat(item.nickname()).isEqualTo("동구");
+            assertThat(item.userId()).isEqualTo(author.getId());
+        });
+    }
+
+    @Test
+    @DisplayName("호칭 조회는 이 그룹과 조회자 기준으로, 작성자 userId 집합으로 좁혀 호출된다")
+    void aliasLookupIsScopedToViewerGroupAndAuthors() {
+        givenSingleVideoFeed(profile(user(2L), "동구", null));
+        given(aliasReader.findAliases(any(), any(), any())).willReturn(Map.of());
+
+        feedService.getFeed(USER_ID, GROUP_ID, SERVICE_DATE, 0, 2);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<java.util.Collection<Long>> captor =
+                ArgumentCaptor.forClass(java.util.Collection.class);
+        verify(aliasReader).findAliases(eq(GROUP_ID), eq(USER_ID), captor.capture());
+        assertThat(captor.getValue()).containsExactly(2L);
+    }
+
+    @Test
+    @DisplayName("프로필이 없는 작성자에게도 호칭은 적용된다")
+    void appliesAliasEvenWhenAuthorHasNoProfile() {
+        givenSingleVideoFeedWithoutProfile();
+        given(aliasReader.findAliases(eq(GROUP_ID), eq(USER_ID), any())).willReturn(Map.of(2L, "막내"));
+
+        FeedResponse response = feedService.getFeed(USER_ID, GROUP_ID, SERVICE_DATE, 0, 2);
+
+        assertThat(response.items()).singleElement().satisfies(item -> {
+            assertThat(item.nickname()).isNull();
+            assertThat(item.displayName()).isEqualTo("막내");
+        });
+    }
+
+    /** 영상 1건짜리 열린 피드를 준비한다. 반환값은 작성자. */
+    private User givenSingleVideoFeed(UserProfile authorProfile) {
+        User author = givenSingleVideoFeedWithoutProfile();
+        given(userProfileRepository.findAllById(any())).willReturn(List.of(authorProfile));
+        return author;
+    }
+
+    private User givenSingleVideoFeedWithoutProfile() {
+        User author = user(2L);
+        Video video = video(100L, author, question(30L, "오늘 가장 웃겼던 일은?"),
+                LocalDateTime.of(2026, 7, 24, 12, 0));
+
+        given(dailyAnswerRepository.findByGroupIdAndUserIdAndServiceDate(GROUP_ID, USER_ID, SERVICE_DATE))
+                .willReturn(Optional.of(answer(AnswerUploadStatus.UPLOADED)));
+        given(videoRepository.findByGroupIdAndDailyAnswerServiceDateAndStatus(
+                eq(GROUP_ID), eq(SERVICE_DATE), eq(VideoStatus.ACTIVE), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(video), PageRequest.of(0, 2), 1));
+        given(userProfileRepository.findAllById(any())).willReturn(List.of());
+        given(feedReactionQueryRepository.countByVideoIds(List.of(100L))).willReturn(List.of());
+        given(feedReactionQueryRepository.findReactedVideoIds(USER_ID, List.of(100L))).willReturn(List.of());
+        given(feedCommentQueryRepository.countActiveByVideoIds(List.of(100L))).willReturn(List.of());
+        return author;
     }
 
     private FeedCountProjection count(Long videoId, Long totalCount) {

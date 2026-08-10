@@ -7,9 +7,11 @@ import static com.example.v_o_server.domain.group.GroupTestFixtures.user;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -18,6 +20,8 @@ import com.example.v_o_server.common.exception.ErrorCode;
 import com.example.v_o_server.common.storage.FileStorageService;
 import com.example.v_o_server.domain.group.dto.GroupCreateRequest;
 import com.example.v_o_server.domain.group.dto.GroupCreateResponse;
+import com.example.v_o_server.domain.group.dto.GroupDetailResponse;
+import com.example.v_o_server.domain.group.dto.GroupMemberResponse;
 import com.example.v_o_server.domain.group.dto.GroupUpdateRequest;
 import com.example.v_o_server.domain.group.entity.GroupMember;
 import com.example.v_o_server.domain.group.entity.GroupMemberRole;
@@ -65,12 +69,24 @@ class GroupServiceTest {
     private GroupAccessGuard accessGuard;
     @Mock
     private FileStorageService fileStorageService;
+    @Mock
+    private GroupMemberViewAssembler memberViewAssembler;
 
     @InjectMocks
     private GroupService groupService;
 
     private GroupCreateRequest createRequest(String name, LocalTime start, LocalTime end) {
         return new GroupCreateRequest(name, "FAMILY", start, end);
+    }
+
+    /**
+     * 조립기가 돌려주는 방장 멤버 뷰. 조립 규칙(프로필·호칭 병합)은 GroupMemberViewAssemblerTest가 검증하므로
+     * 여기서는 GroupService가 조립기 결과를 그대로 흘려보내는지만 본다.
+     */
+    private GroupMemberResponse ownerMemberView(PrivateGroup group, User owner) {
+        return GroupMemberResponse.of(
+                member(1L, group, owner, GroupMemberRole.OWNER, MemberStatus.ACTIVE),
+                "홍길동", null, null, "홍길동", true);
     }
 
     @Nested
@@ -90,6 +106,8 @@ class GroupServiceTest {
             given(privateGroupRepository.save(any(PrivateGroup.class))).willReturn(group);
             given(groupMemberRepository.save(any(GroupMember.class)))
                     .willReturn(member(1L, group, owner, GroupMemberRole.OWNER, MemberStatus.ACTIVE));
+            given(memberViewAssembler.assemble(eq(GROUP_ID), eq(USER_ID), anyList()))
+                    .willReturn(List.of(ownerMemberView(group, owner)));
 
             GroupCreateResponse response = groupService.createGroup(
                     USER_ID, createRequest("우리 가족", LocalTime.of(20, 0), LocalTime.of(21, 0)));
@@ -224,8 +242,8 @@ class GroupServiceTest {
             given(accessGuard.getActiveGroup(GROUP_ID)).willReturn(group);
             given(groupMemberRepository.existsActiveGroupNameForUser(USER_ID, "새 이름", GROUP_ID))
                     .willReturn(false);
-            given(groupMemberRepository.findByGroupIdAndStatus(GROUP_ID, MemberStatus.ACTIVE))
-                    .willReturn(List.of(member(1L, group, owner, GroupMemberRole.OWNER, MemberStatus.ACTIVE)));
+            given(memberViewAssembler.assembleActiveMembers(GROUP_ID, USER_ID))
+                    .willReturn(List.of(ownerMemberView(group, owner)));
 
             groupService.updateGroup(USER_ID, GROUP_ID, new GroupUpdateRequest("새 이름", null), null);
 
@@ -244,8 +262,8 @@ class GroupServiceTest {
             given(accessGuard.getActiveGroup(GROUP_ID)).willReturn(group);
             given(fileStorageService.upload(eq(image), any()))
                     .willReturn(new FileStorageService.StoredFile("https://cdn/a.png", "key/a.png"));
-            given(groupMemberRepository.findByGroupIdAndStatus(GROUP_ID, MemberStatus.ACTIVE))
-                    .willReturn(List.of(member(1L, group, owner, GroupMemberRole.OWNER, MemberStatus.ACTIVE)));
+            given(memberViewAssembler.assembleActiveMembers(GROUP_ID, USER_ID))
+                    .willReturn(List.of(ownerMemberView(group, owner)));
 
             groupService.updateGroup(USER_ID, GROUP_ID, new GroupUpdateRequest(null, null), image);
 
@@ -263,8 +281,8 @@ class GroupServiceTest {
             given(accessGuard.getActiveGroup(GROUP_ID)).willReturn(group);
             given(groupThemeRepository.findByCode("COUPLE"))
                     .willReturn(Optional.of(theme(2L, "COUPLE")));
-            given(groupMemberRepository.findByGroupIdAndStatus(GROUP_ID, MemberStatus.ACTIVE))
-                    .willReturn(List.of(member(1L, group, owner, GroupMemberRole.OWNER, MemberStatus.ACTIVE)));
+            given(memberViewAssembler.assembleActiveMembers(GROUP_ID, USER_ID))
+                    .willReturn(List.of(ownerMemberView(group, owner)));
 
             groupService.updateGroup(USER_ID, GROUP_ID, new GroupUpdateRequest(null, "COUPLE"), null);
 
@@ -345,6 +363,57 @@ class GroupServiceTest {
             assertThatThrownBy(() -> groupService.deleteGroup(USER_ID, GROUP_ID))
                     .isInstanceOf(BusinessException.class)
                     .extracting("errorCode").isEqualTo(ErrorCode.GROUP_NOT_FOUND);
+        }
+    }
+
+    @Nested
+    @DisplayName("그룹 상세 조회")
+    class GetGroupDetail {
+
+        private static final Long OTHER_USER_ID = 2L;
+        private static final Long TARGET_USER_ID = 3L;
+
+        /**
+         * 호칭 격리의 서비스 계층 계약: 상세 조회는 <b>호출자를 그대로 viewer로</b> 조립기에 넘겨야 한다.
+         * 여기서 viewer가 섞이면 남의 호칭이 노출된다.
+         */
+        @Test
+        @DisplayName("호출자별로 다른 viewer로 조립해 A와 B가 서로 다른 호칭을 본다")
+        void passesCallerAsViewerSoAliasesStayIsolated() {
+            User owner = user(USER_ID);
+            PrivateGroup group = group(GROUP_ID, owner, 15);
+            User target = user(TARGET_USER_ID);
+            GroupMember targetMember =
+                    member(13L, group, target, GroupMemberRole.MEMBER, MemberStatus.ACTIVE);
+
+            given(accessGuard.getActiveGroup(GROUP_ID)).willReturn(group);
+            given(memberViewAssembler.assembleActiveMembers(GROUP_ID, USER_ID)).willReturn(List.of(
+                    GroupMemberResponse.of(targetMember, "김유진", null, "엄마", "엄마", false)));
+            given(memberViewAssembler.assembleActiveMembers(GROUP_ID, OTHER_USER_ID)).willReturn(List.of(
+                    GroupMemberResponse.of(targetMember, "김유진", null, null, "김유진", false)));
+
+            GroupDetailResponse seenByA = groupService.getGroupDetail(USER_ID, GROUP_ID);
+            GroupDetailResponse seenByB = groupService.getGroupDetail(OTHER_USER_ID, GROUP_ID);
+
+            assertThat(seenByA.members().get(0).displayName()).isEqualTo("엄마");
+            assertThat(seenByB.members().get(0).displayName()).isEqualTo("김유진");
+            assertThat(seenByB.members().get(0).alias()).isNull();
+
+            verify(memberViewAssembler).assembleActiveMembers(GROUP_ID, USER_ID);
+            verify(memberViewAssembler).assembleActiveMembers(GROUP_ID, OTHER_USER_ID);
+        }
+
+        @Test
+        @DisplayName("멤버가 아니면 NOT_GROUP_MEMBER — 조립기를 호출하지 않는다")
+        void rejectsNonMemberBeforeAssembling() {
+            given(accessGuard.getActiveGroup(GROUP_ID)).willReturn(group(GROUP_ID, user(USER_ID), 15));
+            willThrow(new BusinessException(ErrorCode.NOT_GROUP_MEMBER))
+                    .given(accessGuard).assertMember(GROUP_ID, USER_ID);
+
+            assertThatThrownBy(() -> groupService.getGroupDetail(USER_ID, GROUP_ID))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode").isEqualTo(ErrorCode.NOT_GROUP_MEMBER);
+            verify(memberViewAssembler, never()).assembleActiveMembers(any(), any());
         }
     }
 }

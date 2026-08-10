@@ -1,7 +1,9 @@
 package com.example.v_o_server.domain.group.controller;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.v_o_server.common.jwt.JwtProvider;
@@ -11,6 +13,7 @@ import com.example.v_o_server.common.security.JwtAuthenticationEntryPoint;
 import com.example.v_o_server.common.security.JwtAuthenticationFilter;
 import com.example.v_o_server.config.SecurityConfig;
 import com.example.v_o_server.domain.group.service.GroupInviteService;
+import com.example.v_o_server.domain.group.service.GroupMemberAliasService;
 import com.example.v_o_server.domain.group.service.GroupMemberService;
 import com.example.v_o_server.domain.group.service.GroupService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -43,6 +46,8 @@ class GroupControllerSecurityTest {
     @MockitoBean
     private GroupMemberService groupMemberService;
     @MockitoBean
+    private GroupMemberAliasService groupMemberAliasService;
+    @MockitoBean
     private JwtProvider jwtProvider;
     @MockitoBean
     private TokenBlacklistService tokenBlacklistService;
@@ -66,6 +71,29 @@ class GroupControllerSecurityTest {
                                 {"groupName":"우리 가족","themeCode":"FAMILY",
                                  "notificationStartTime":"20:00:00","notificationEndTime":"21:00:00"}
                                 """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("토큰 없이 그룹 멤버 목록을 호출하면 401")
+    void memberListRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/v1/groups/100/members"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("토큰 없이 멤버 호칭을 설정하면 401")
+    void upsertAliasRequiresAuthentication() throws Exception {
+        mockMvc.perform(put("/api/v1/groups/100/members/10/alias")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"alias\":\"엄마\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("토큰 없이 멤버 호칭을 해제하면 401")
+    void deleteAliasRequiresAuthentication() throws Exception {
+        mockMvc.perform(delete("/api/v1/groups/100/members/10/alias"))
                 .andExpect(status().isUnauthorized());
     }
 }
