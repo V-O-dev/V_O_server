@@ -135,6 +135,7 @@ public class FeedService {
                 video.getUser().getId(),
                 memberId,
                 nickname,
+                alias,
                 GroupMemberAliasReader.resolveDisplayName(alias, nickname),
                 profile == null ? null : profile.getProfileImageUrl(),
                 video.getQuestion().getId(),
