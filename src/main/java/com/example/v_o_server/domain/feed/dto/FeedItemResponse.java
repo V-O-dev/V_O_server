@@ -19,7 +19,12 @@ public record FeedItemResponse(
         @Schema(description = "작성자가 직접 설정한 전역 닉네임", nullable = true)
         String nickname,
 
-        @Schema(description = "화면에 표시할 이름. 내가 이 그룹에서 작성자에게 지정한 호칭이 있으면 그 호칭, 없으면 닉네임",
+        @Schema(description = "내가 이 그룹에서 작성자에게 지정한 호칭. 지정하지 않았으면 null. "
+                + "이름 편집 화면의 입력 기본값으로 쓴다.",
+                example = "엄마", nullable = true)
+        String alias,
+
+        @Schema(description = "화면에 표시할 이름. 호칭이 있으면 호칭, 없으면 닉네임",
                 example = "엄마", nullable = true)
         String displayName,
 

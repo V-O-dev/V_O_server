@@ -156,7 +156,8 @@ class FeedServiceTest {
             assertThat(item.videoId()).isEqualTo(100L);
             assertThat(item.userId()).isEqualTo(2L);
             assertThat(item.nickname()).isEqualTo("동구");
-            // 호칭을 지정하지 않았으므로 표시 이름은 전역 닉네임 그대로.
+            // 호칭을 지정하지 않았으므로 alias는 비고 표시 이름은 전역 닉네임 그대로.
+            assertThat(item.alias()).isNull();
             assertThat(item.displayName()).isEqualTo("동구");
             assertThat(item.profileImageUrl()).isEqualTo("https://cdn.example.com/profile.jpg");
             assertThat(item.questionId()).isEqualTo(30L);
@@ -189,6 +190,8 @@ class FeedServiceTest {
 
         assertThat(response.items()).singleElement().satisfies(item -> {
             assertThat(item.displayName()).isEqualTo("막내");
+            // 이름 편집 화면 입력 기본값으로 쓰도록 호칭 원본도 함께 내려준다.
+            assertThat(item.alias()).isEqualTo("막내");
             assertThat(item.nickname()).isEqualTo("동구");
             assertThat(item.userId()).isEqualTo(author.getId());
         });
