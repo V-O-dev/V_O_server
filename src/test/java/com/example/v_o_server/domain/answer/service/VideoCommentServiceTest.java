@@ -129,7 +129,8 @@ class VideoCommentServiceTest {
         assertThat(first.commentId()).isEqualTo(COMMENT_ID);
         assertThat(first.isMine()).isFalse();
         assertThat(first.writer().nickname()).isEqualTo("친구");
-        // 호칭을 지정하지 않았으면 표시 이름은 전역 닉네임 그대로.
+        // 호칭을 지정하지 않았으면 alias는 비고 표시 이름은 전역 닉네임 그대로.
+        assertThat(first.writer().alias()).isNull();
         assertThat(first.writer().displayName()).isEqualTo("친구");
     }
 
@@ -159,7 +160,11 @@ class VideoCommentServiceTest {
 
         CommentResponse.Writer writer = response.comments().get(0).writer();
         assertThat(writer.displayName()).isEqualTo("아빠");
+        // 이름 편집 화면 입력 기본값으로 쓰도록 호칭 원본도 함께 내려준다.
+        assertThat(writer.alias()).isEqualTo("아빠");
         assertThat(writer.nickname()).isEqualTo("홍길동");
+        // 호칭 API 경로에 넣을 groupId도 응답에 실린다.
+        assertThat(response.comments().get(0).groupId()).isEqualTo(GROUP_ID);
         verify(aliasReader).findAliases(GROUP_ID, USER_ID, List.of(OTHER_USER_ID));
     }
 
@@ -246,8 +251,10 @@ class VideoCommentServiceTest {
 
         assertThat(response.writer().nickname()).isEqualTo("나");
         assertThat(response.writer().displayName()).isEqualTo("나");
-        // 자기 자신에게는 호칭을 지정할 수 없으므로 편집 진입용 memberId도 내리지 않는다.
+        // 자기 자신에게는 호칭을 지정할 수 없으므로 alias·memberId 모두 내리지 않는다.
+        assertThat(response.writer().alias()).isNull();
         assertThat(response.writer().memberId()).isNull();
+        assertThat(response.groupId()).isEqualTo(GROUP_ID);
         assertThat(response.isMine()).isTrue();
     }
 
