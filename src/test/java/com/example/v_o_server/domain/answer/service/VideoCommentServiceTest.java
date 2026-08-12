@@ -169,6 +169,39 @@ class VideoCommentServiceTest {
     }
 
     @Test
+    @DisplayName("댓글 목록 조회 - 호칭을 원래 닉네임과 똑같이 지어도 alias가 채워진다")
+    void getComments_aliasIsNotNullEvenWhenIdenticalToNickname() {
+        Video video = activeVideo();
+        given(feedAccessPolicy.canAccess(USER_ID, video)).willReturn(true);
+
+        VideoComment comment = commentBy(OTHER_USER_ID);
+        given(comment.getId()).willReturn(COMMENT_ID);
+        given(comment.getContent()).willReturn("허허허");
+        given(videoCommentRepository.findByVideo_IdAndIsDeletedFalseAndIdGreaterThanOrderByIdAsc(
+                eq(VIDEO_ID), eq(0L), any(Pageable.class))).willReturn(List.of(comment));
+
+        UserProfile profile = mock(UserProfile.class);
+        User profileUser = mock(User.class);
+        given(profileUser.getId()).willReturn(OTHER_USER_ID);
+        given(profile.getUser()).willReturn(profileUser);
+        given(profile.getNickname()).willReturn("홍길동");
+        given(userProfileRepository.findAllById(List.of(OTHER_USER_ID))).willReturn(List.of(profile));
+        // 조회자가 호칭을 하필 상대의 원래 닉네임과 똑같은 값으로 지정해 둔 상황.
+        given(aliasReader.findAliases(GROUP_ID, USER_ID, List.of(OTHER_USER_ID)))
+                .willReturn(Map.of(OTHER_USER_ID, "홍길동"));
+
+        CommentListResponse response = videoCommentService.getComments(USER_ID, VIDEO_ID, null);
+
+        CommentResponse.Writer writer = response.comments().get(0).writer();
+        // 이 케이스가 alias 필드를 추가한 이유다. 세 값이 모두 같아지므로
+        // "displayName != nickname" 추론으로는 호칭을 지정했다는 사실을 알아낼 수 없고,
+        // 이름 편집 화면이 입력창을 빈칸으로 열어 기존 호칭을 날려버린다.
+        assertThat(writer.alias()).isEqualTo("홍길동");
+        assertThat(writer.nickname()).isEqualTo("홍길동");
+        assertThat(writer.displayName()).isEqualTo("홍길동");
+    }
+
+    @Test
     @DisplayName("댓글 목록 조회 - 작성자의 memberId를 실어 호칭 편집 화면으로 갈 수 있게 한다")
     void getComments_carriesMemberId() {
         Video video = activeVideo();
