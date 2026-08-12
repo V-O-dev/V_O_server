@@ -29,7 +29,8 @@ public class FeedController {
 
     @Operation(
             summary = "그룹 영상 피드 조회",
-            description = "해당 날짜에 답변을 업로드한 그룹 멤버에게 ACTIVE 영상 피드를 최신순으로 제공합니다."
+            description = "해당 날짜의 ACTIVE 영상 피드를 최신순으로 제공합니다. "
+                    + "조회자가 답변을 업로드하지 않았다면 unlocked=false이며, 클라이언트는 items의 영상을 블러 처리해야 합니다."
     )
     @GetMapping
     public ApiResponse<FeedResponse> getFeed(

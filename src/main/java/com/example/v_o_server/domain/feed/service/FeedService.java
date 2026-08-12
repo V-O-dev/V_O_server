@@ -59,10 +59,7 @@ public class FeedService {
         AnswerUploadStatus viewerStatus = viewerAnswer == null
                 ? AnswerUploadStatus.NOT_UPLOADED
                 : viewerAnswer.getStatus();
-
-        if (viewerAnswer == null || !viewerAnswer.isUploaded()) {
-            return FeedResponse.locked(serviceDate, viewerStatus, page, size);
-        }
+        boolean unlocked = viewerAnswer != null && viewerAnswer.isUploaded();
 
         PageRequest pageable = PageRequest.of(
                 page,
@@ -112,7 +109,9 @@ public class FeedService {
                     commentCounts.getOrDefault(video.getId(), 0L)
             );
         });
-        return FeedResponse.unlocked(serviceDate, viewerStatus, items);
+        return unlocked
+                ? FeedResponse.unlocked(serviceDate, viewerStatus, items)
+                : FeedResponse.locked(serviceDate, viewerStatus, items);
     }
 
     private Map<Long, Long> countByVideoId(List<FeedCountProjection> counts) {

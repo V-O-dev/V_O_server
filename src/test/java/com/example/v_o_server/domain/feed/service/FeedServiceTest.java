@@ -4,9 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.example.v_o_server.domain.answer.entity.AnswerUploadStatus;
 import com.example.v_o_server.domain.answer.entity.DailyAnswer;
@@ -83,40 +81,64 @@ class FeedServiceTest {
     }
 
     @Test
-    @DisplayName("답변을 업로드하지 않은 멤버에게는 잠긴 빈 피드를 반환한다")
+    @DisplayName("답변을 업로드하지 않은 멤버에게 잠긴 상태와 다른 멤버의 피드를 반환한다")
     void returnsLockedFeedWhenViewerHasNoAnswer() {
+        User author = user(2L);
+        Video video = video(100L, author, question(30L, "오늘 가장 웃겼던 일은?"),
+                LocalDateTime.of(2026, 7, 24, 12, 0));
         given(dailyAnswerRepository.findByGroupIdAndUserIdAndServiceDate(
                 GROUP_ID, USER_ID, SERVICE_DATE)).willReturn(Optional.empty());
+        given(videoRepository.findByGroupIdAndDailyAnswerServiceDateAndStatus(
+                eq(GROUP_ID), eq(SERVICE_DATE), eq(VideoStatus.ACTIVE), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(video), PageRequest.of(0, 20), 1));
+        given(userProfileRepository.findAllById(any())).willReturn(List.of());
+        given(feedReactionQueryRepository.countByVideoIds(List.of(100L))).willReturn(List.of());
+        given(feedReactionQueryRepository.findReactedVideoIds(USER_ID, List.of(100L))).willReturn(List.of());
+        given(feedCommentQueryRepository.countActiveByVideoIds(List.of(100L))).willReturn(List.of());
 
         FeedResponse response = feedService.getFeed(USER_ID, GROUP_ID, SERVICE_DATE, 0, 20);
 
         assertThat(response.unlocked()).isFalse();
         assertThat(response.viewerAnswerStatus()).isEqualTo(AnswerUploadStatus.NOT_UPLOADED);
-        assertThat(response.items()).isEmpty();
-        assertThat(response.totalElements()).isZero();
+        assertThat(response.items()).singleElement().satisfies(item -> {
+            assertThat(item.videoId()).isEqualTo(100L);
+            assertThat(item.userId()).isEqualTo(2L);
+            assertThat(item.videoUrl()).isEqualTo("https://cdn.example.com/video.mp4");
+        });
+        assertThat(response.totalElements()).isOne();
         verify(groupAccessGuard).getActiveGroup(GROUP_ID);
         verify(groupAccessGuard).assertMember(GROUP_ID, USER_ID);
-        verify(videoRepository, never())
-                .findByGroupIdAndDailyAnswerServiceDateAndStatus(any(), any(), any(), any());
-        verifyNoInteractions(feedReactionQueryRepository, feedCommentQueryRepository);
+        verify(videoRepository).findByGroupIdAndDailyAnswerServiceDateAndStatus(
+                eq(GROUP_ID), eq(SERVICE_DATE), eq(VideoStatus.ACTIVE), any(Pageable.class));
     }
 
     @Test
-    @DisplayName("업로드 실패 상태인 멤버에게도 피드를 잠근다")
+    @DisplayName("업로드 실패 상태인 멤버에게도 잠긴 상태와 다른 멤버의 피드를 반환한다")
     void returnsLockedFeedWhenUploadFailed() {
         DailyAnswer failedAnswer = answer(AnswerUploadStatus.UPLOAD_FAILED);
+        User author = user(2L);
+        Video video = video(101L, author, question(31L, "오늘 고마웠던 일은?"),
+                LocalDateTime.of(2026, 7, 24, 13, 0));
         given(dailyAnswerRepository.findByGroupIdAndUserIdAndServiceDate(
                 GROUP_ID, USER_ID, SERVICE_DATE)).willReturn(Optional.of(failedAnswer));
+        given(videoRepository.findByGroupIdAndDailyAnswerServiceDateAndStatus(
+                eq(GROUP_ID), eq(SERVICE_DATE), eq(VideoStatus.ACTIVE), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(video), PageRequest.of(1, 10), 11));
+        given(userProfileRepository.findAllById(any())).willReturn(List.of());
+        given(feedReactionQueryRepository.countByVideoIds(List.of(101L))).willReturn(List.of());
+        given(feedReactionQueryRepository.findReactedVideoIds(USER_ID, List.of(101L))).willReturn(List.of());
+        given(feedCommentQueryRepository.countActiveByVideoIds(List.of(101L))).willReturn(List.of());
 
         FeedResponse response = feedService.getFeed(USER_ID, GROUP_ID, SERVICE_DATE, 1, 10);
 
         assertThat(response.unlocked()).isFalse();
         assertThat(response.viewerAnswerStatus()).isEqualTo(AnswerUploadStatus.UPLOAD_FAILED);
+        assertThat(response.items()).singleElement()
+                .satisfies(item -> assertThat(item.videoId()).isEqualTo(101L));
         assertThat(response.page()).isEqualTo(1);
         assertThat(response.size()).isEqualTo(10);
-        verify(videoRepository, never())
-                .findByGroupIdAndDailyAnswerServiceDateAndStatus(any(), any(), any(), any());
-        verifyNoInteractions(feedReactionQueryRepository, feedCommentQueryRepository);
+        assertThat(response.totalElements()).isEqualTo(11);
+        assertThat(response.hasNext()).isFalse();
     }
 
     @Test

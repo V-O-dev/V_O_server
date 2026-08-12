@@ -8,7 +8,7 @@ import org.springframework.data.domain.Page;
 
 @Schema(description = "그룹 영상 피드 응답")
 public record FeedResponse(
-        @Schema(description = "피드 잠금 해제 여부")
+        @Schema(description = "피드 잠금 해제 여부. false이면 클라이언트에서 영상 피드를 블러 처리")
         boolean unlocked,
 
         @Schema(description = "조회 기준 서비스 날짜")
@@ -17,7 +17,7 @@ public record FeedResponse(
         @Schema(description = "조회자의 해당 날짜 답변 상태")
         AnswerUploadStatus viewerAnswerStatus,
 
-        @Schema(description = "피드 영상 목록. 잠금 상태이면 빈 배열")
+        @Schema(description = "피드 영상 목록. 잠금 상태에서도 블러 표시를 위해 다른 멤버의 영상이 포함됨")
         List<FeedItemResponse> items,
 
         @Schema(description = "현재 페이지 번호(0부터 시작)")
@@ -39,20 +39,9 @@ public record FeedResponse(
     public static FeedResponse locked(
             LocalDate serviceDate,
             AnswerUploadStatus viewerAnswerStatus,
-            int page,
-            int size
+            Page<FeedItemResponse> items
     ) {
-        return new FeedResponse(
-                false,
-                serviceDate,
-                viewerAnswerStatus,
-                List.of(),
-                page,
-                size,
-                0,
-                0,
-                false
-        );
+        return from(false, serviceDate, viewerAnswerStatus, items);
     }
 
     public static FeedResponse unlocked(
@@ -60,8 +49,17 @@ public record FeedResponse(
             AnswerUploadStatus viewerAnswerStatus,
             Page<FeedItemResponse> items
     ) {
+        return from(true, serviceDate, viewerAnswerStatus, items);
+    }
+
+    private static FeedResponse from(
+            boolean unlocked,
+            LocalDate serviceDate,
+            AnswerUploadStatus viewerAnswerStatus,
+            Page<FeedItemResponse> items
+    ) {
         return new FeedResponse(
-                true,
+                unlocked,
                 serviceDate,
                 viewerAnswerStatus,
                 items.getContent(),
