@@ -60,7 +60,9 @@ class FeedControllerTest {
                 10L,
                 2L,
                 21L,
+                false,
                 "동구",
+                "막내",
                 "막내",
                 "https://cdn.example.com/profile.jpg",
                 20L,
@@ -96,8 +98,12 @@ class FeedControllerTest {
                 .andExpect(jsonPath("$.data.viewerAnswerStatus").value("UPLOADED"))
                 .andExpect(jsonPath("$.data.items[0].videoId").value(10))
                 .andExpect(jsonPath("$.data.items[0].nickname").value("동구"))
+                .andExpect(jsonPath("$.data.items[0].alias").value("막내"))
                 .andExpect(jsonPath("$.data.items[0].displayName").value("막내"))
                 .andExpect(jsonPath("$.data.items[0].memberId").value(21))
+                // 프론트가 feed.isMe로 읽으므로 직렬화된 키 이름까지 고정한다.
+                // Jackson이 boolean 레코드 컴포넌트를 "me"로 깎으면 조용히 깨진다.
+                .andExpect(jsonPath("$.data.items[0].isMe").value(false))
                 .andExpect(jsonPath("$.data.items[0].questionContent")
                         .value("오늘 가장 웃겼던 일은?"))
                 .andExpect(jsonPath("$.data.items[0].reactionCount").value(4))
