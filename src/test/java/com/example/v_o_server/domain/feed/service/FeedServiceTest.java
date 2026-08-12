@@ -220,8 +220,10 @@ class FeedServiceTest {
 
         FeedResponse response = feedService.getFeed(USER_ID, GROUP_ID, SERVICE_DATE, 0, 2);
 
-        assertThat(response.items()).singleElement()
-                .satisfies(item -> assertThat(item.memberId()).isEqualTo(21L));
+        assertThat(response.items()).singleElement().satisfies(item -> {
+            assertThat(item.memberId()).isEqualTo(21L);
+            assertThat(item.isMe()).isFalse();
+        });
         verify(memberIdResolver).findMemberIds(eq(GROUP_ID), any());
     }
 
@@ -249,19 +251,24 @@ class FeedServiceTest {
         assertThat(response.items()).singleElement().satisfies(item -> {
             assertThat(item.userId()).isEqualTo(USER_ID);
             assertThat(item.memberId()).isNull();
+            assertThat(item.isMe()).isTrue();
         });
     }
 
     @Test
-    @DisplayName("영상을 남기고 그룹을 나간 작성자는 memberId가 null이다 — 호칭을 지정할 수 없다")
+    @DisplayName("영상을 남기고 그룹을 나간 작성자는 memberId가 null이지만 isMe는 false다")
     void memberIdIsNullForAuthorWhoLeftTheGroup() {
         givenSingleVideoFeed(profile(user(2L), "동구", null));
         given(memberIdResolver.findMemberIds(eq(GROUP_ID), any())).willReturn(Map.of());
 
         FeedResponse response = feedService.getFeed(USER_ID, GROUP_ID, SERVICE_DATE, 0, 2);
 
-        assertThat(response.items()).singleElement()
-                .satisfies(item -> assertThat(item.memberId()).isNull());
+        assertThat(response.items()).singleElement().satisfies(item -> {
+            assertThat(item.memberId()).isNull();
+            // memberId가 null이라고 "내 영상"인 것은 아니다. 두 값이 독립임을 고정한다 —
+            // 클라이언트가 memberId == null 로 본인 여부를 유추하면 나간 사람의 카드까지 내 것으로 취급한다.
+            assertThat(item.isMe()).isFalse();
+        });
     }
 
     @Test

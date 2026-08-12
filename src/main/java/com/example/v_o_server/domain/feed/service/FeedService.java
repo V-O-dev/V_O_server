@@ -98,18 +98,20 @@ public class FeedService {
         // 피드 카드에서 바로 호칭 편집 화면으로 갈 수 있도록 멤버 ID를 함께 내려준다(FED_BLR_01).
         Map<Long, Long> memberIds = memberIdResolver.findMemberIds(groupId, authorIds);
 
-        Page<FeedItemResponse> items = videos.map(video ->
-                toFeedItem(
-                        video,
-                        profilesByUserId.get(video.getUser().getId()),
-                        aliases.get(video.getUser().getId()),
-                        // 내 영상에는 편집 진입용 memberId를 내리지 않는다 — 자기 자신에게는 호칭을 지정할 수 없다(G017).
-                        userId.equals(video.getUser().getId())
-                                ? null : memberIds.get(video.getUser().getId()),
-                        reactionCounts.getOrDefault(video.getId(), 0L),
-                        reactedVideoIds.contains(video.getId()),
-                        commentCounts.getOrDefault(video.getId(), 0L)
-                ));
+        Page<FeedItemResponse> items = videos.map(video -> {
+            boolean isMe = userId.equals(video.getUser().getId());
+            return toFeedItem(
+                    video,
+                    profilesByUserId.get(video.getUser().getId()),
+                    aliases.get(video.getUser().getId()),
+                    // 내 영상에는 편집 진입용 memberId를 내리지 않는다 — 자기 자신에게는 호칭을 지정할 수 없다(G017).
+                    isMe ? null : memberIds.get(video.getUser().getId()),
+                    isMe,
+                    reactionCounts.getOrDefault(video.getId(), 0L),
+                    reactedVideoIds.contains(video.getId()),
+                    commentCounts.getOrDefault(video.getId(), 0L)
+            );
+        });
         return FeedResponse.unlocked(serviceDate, viewerStatus, items);
     }
 
@@ -125,6 +127,7 @@ public class FeedService {
             UserProfile profile,
             String alias,
             Long memberId,
+            boolean isMe,
             long reactionCount,
             boolean reactedByMe,
             long commentCount
@@ -134,6 +137,7 @@ public class FeedService {
                 video.getId(),
                 video.getUser().getId(),
                 memberId,
+                isMe,
                 nickname,
                 alias,
                 GroupMemberAliasReader.resolveDisplayName(alias, nickname),

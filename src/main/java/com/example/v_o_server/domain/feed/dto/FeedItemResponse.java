@@ -16,6 +16,12 @@ public record FeedItemResponse(
                 example = "10", nullable = true)
         Long memberId,
 
+        @Schema(description = "내가 올린 영상인지 여부. true면 호칭 편집 화면으로 진입시키지 않는다 — "
+                + "자기 자신에게는 호칭을 지정할 수 없다. "
+                + "memberId가 null인 것으로는 판단할 수 없다. 그룹을 나간 작성자도 null이기 때문이다.",
+                example = "false")
+        boolean isMe,
+
         @Schema(description = "작성자가 직접 설정한 전역 닉네임", nullable = true)
         String nickname,
 
