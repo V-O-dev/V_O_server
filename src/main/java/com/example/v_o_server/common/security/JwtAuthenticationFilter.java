@@ -31,6 +31,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtProvider jwtProvider;
     private final TokenBlacklistService tokenBlacklistService;
+    private final AccountStatusChecker accountStatusChecker;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -43,8 +44,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String jti = jwtProvider.getJti(claims);
                 if (!tokenBlacklistService.isBlacklisted(jti)) {
                     Long userId = jwtProvider.getUserId(claims);
-                    var authentication = new UsernamePasswordAuthenticationToken(userId, null, List.of());
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    // 토큰이 유효해도 탈퇴한 계정이면 인증하지 않는다.
+                    // (탈퇴 시 블랙리스트에 넣지 못한 다른 기기의 accessToken을 여기서 막는다)
+                    if (accountStatusChecker.isActive(userId)) {
+                        var authentication = new UsernamePasswordAuthenticationToken(userId, null, List.of());
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    } else {
+                        log.debug("사용할 수 없는 계정의 토큰입니다. userId={}", userId);
+                    }
                 }
             } catch (JwtException | NumberFormatException e) {
                 log.debug("Invalid access token: {}", e.getMessage());

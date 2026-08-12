@@ -222,17 +222,23 @@ public class AuthController {
     @PostMapping("/logout")
     public ApiResponse<Void> logout(@RequestHeader("Authorization") String authorizationHeader,
             @Valid @RequestBody LogoutRequest request) {
-        String accessToken = authorizationHeader.startsWith(BEARER_PREFIX)
-                ? authorizationHeader.substring(BEARER_PREFIX.length())
-                : authorizationHeader;
-        authService.logout(accessToken, request);
+        authService.logout(extractAccessToken(authorizationHeader), request);
         return ApiResponse.ok();
     }
 
-    @Operation(summary = "회원 탈퇴", description = "본인 계정을 soft delete 처리하고 OAuth 연결을 해제한다.")
+    @Operation(summary = "회원 탈퇴",
+            description = "본인 계정을 soft delete 처리하고 OAuth 연결 해제 및 모든 기기의 토큰을 무효화한다.")
     @DeleteMapping("/withdraw")
-    public ApiResponse<Void> withdraw(@AuthenticationPrincipal Long userId) {
-        authService.withdraw(userId);
+    public ApiResponse<Void> withdraw(@AuthenticationPrincipal Long userId,
+            @RequestHeader("Authorization") String authorizationHeader) {
+        authService.withdraw(userId, extractAccessToken(authorizationHeader));
         return ApiResponse.ok();
+    }
+
+    /** {@code Authorization: Bearer xxx} 헤더에서 토큰만 꺼낸다. */
+    private String extractAccessToken(String authorizationHeader) {
+        return authorizationHeader.startsWith(BEARER_PREFIX)
+                ? authorizationHeader.substring(BEARER_PREFIX.length())
+                : authorizationHeader;
     }
 }

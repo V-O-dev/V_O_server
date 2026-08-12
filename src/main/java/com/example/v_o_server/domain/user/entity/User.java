@@ -59,6 +59,21 @@ public class User extends BaseTimeEntity {
         this.withdrawnAt = now;
     }
 
+    public boolean isWithdrawn() {
+        return this.status == UserStatus.WITHDRAWN;
+    }
+
+    /**
+     * 탈퇴했던 계정으로 다시 로그인했을 때 되살린다.
+     *
+     * <p>이 처리가 없으면 탈퇴 이력이 있는 사용자는 재로그인해도 계정이 WITHDRAWN으로 남아
+     * 모든 API가 차단된다.</p>
+     */
+    public void reactivate() {
+        this.status = UserStatus.ACTIVE;
+        this.withdrawnAt = null;
+    }
+
     public void updateNotificationSettings(Boolean dailyQuestionNotificationEnabled, Boolean interactionNotificationEnabled) {
         this.dailyQuestionNotificationEnabled = dailyQuestionNotificationEnabled;
         this.interactionNotificationEnabled = interactionNotificationEnabled;
