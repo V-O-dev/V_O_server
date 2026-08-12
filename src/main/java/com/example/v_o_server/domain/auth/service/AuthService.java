@@ -177,6 +177,12 @@ public class AuthService {
                 .ifPresent(token -> token.revoke(LocalDateTime.now(), "LOGOUT"));
     }
 
+    /**
+     * 회원을 soft delete 처리한다.
+     *
+     * <p>사용자 행과 영상·댓글·아카이브 같은 연결 데이터는 과거 그룹 기록 보존을 위해 삭제하지 않는다.
+     * 사용자 상태와 탈퇴 시각만 변경하고 OAuth 연결을 해제한다.</p>
+     */
     public void withdraw(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
