@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.time.Clock;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class FeedController {
 
     private final FeedService feedService;
+    private final Clock clock;
 
     @Operation(
             summary = "그룹 영상 피드 조회",
@@ -44,7 +46,7 @@ public class FeedController {
             @Min(value = 1, message = "페이지 크기는 1 이상이어야 합니다.")
             @Max(value = 50, message = "페이지 크기는 50 이하여야 합니다.") int size
     ) {
-        LocalDate targetDate = serviceDate == null ? LocalDate.now() : serviceDate;
+        LocalDate targetDate = serviceDate == null ? LocalDate.now(clock) : serviceDate;
         return ApiResponse.success(feedService.getFeed(userId, groupId, targetDate, page, size));
     }
 }

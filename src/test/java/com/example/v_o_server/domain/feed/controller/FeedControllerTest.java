@@ -12,8 +12,11 @@ import com.example.v_o_server.domain.answer.entity.AnswerUploadStatus;
 import com.example.v_o_server.domain.feed.dto.FeedItemResponse;
 import com.example.v_o_server.domain.feed.dto.FeedResponse;
 import com.example.v_o_server.domain.feed.service.FeedService;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -47,6 +50,8 @@ class FeedControllerTest {
 
     @MockitoBean
     private FeedService feedService;
+    @MockitoBean
+    private Clock clock;
 
     @AfterEach
     void clearSecurityContext() {
@@ -106,6 +111,33 @@ class FeedControllerTest {
                 .andExpect(jsonPath("$.data.hasNext").value(false));
 
         verify(feedService).getFeed(AUTH_USER_ID, GROUP_ID, SERVICE_DATE, 0, 20);
+    }
+
+    @Test
+    @DisplayName("날짜를 생략하면 서버 기본 타임존이 아닌 KST 오늘 날짜를 사용한다")
+    void defaultsServiceDateToKoreaDate() throws Exception {
+        LocalDate koreaDate = LocalDate.of(2026, 7, 25);
+        given(clock.instant()).willReturn(Instant.parse("2026-07-24T15:30:00Z"));
+        given(clock.getZone()).willReturn(ZoneId.of("Asia/Seoul"));
+        given(feedService.getFeed(AUTH_USER_ID, GROUP_ID, koreaDate, 0, 20))
+                .willReturn(new FeedResponse(
+                        false,
+                        koreaDate,
+                        AnswerUploadStatus.NOT_UPLOADED,
+                        List.of(),
+                        0,
+                        20,
+                        0,
+                        0,
+                        false
+                ));
+
+        mockMvc.perform(get("/api/v1/groups/{groupId}/feed", GROUP_ID)
+                        .with(authUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.serviceDate").value("2026-07-25"));
+
+        verify(feedService).getFeed(AUTH_USER_ID, GROUP_ID, koreaDate, 0, 20);
     }
 
     @Test

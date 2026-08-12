@@ -19,6 +19,7 @@ import com.example.v_o_server.domain.question.entity.Question;
 import com.example.v_o_server.domain.question.repository.GroupDailyQuestionRepository;
 import com.example.v_o_server.domain.user.entity.User;
 import com.example.v_o_server.domain.user.repository.UserRepository;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Locale;
@@ -49,6 +50,7 @@ public class VideoService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final ArchiveEntryWriter archiveEntryWriter;
+    private final Clock clock;
 
     @Transactional
     public VideoResponse uploadVideo(
@@ -63,7 +65,7 @@ public class VideoService {
         PrivateGroup group = groupAccessGuard.getActiveGroup(groupId);
         groupAccessGuard.assertMember(groupId, userId);
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         GroupDailyQuestion groupDailyQuestion = groupDailyQuestionRepository
                 .findByGroupIdAndServiceDate(groupId, today)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DAILY_QUESTION_NOT_ASSIGNED));
@@ -82,7 +84,7 @@ public class VideoService {
 
         User user = userRepository.getReferenceById(userId);
         FileStorageService.StoredFile stored = fileStorageService.upload(video, STORAGE_DIRECTORY);
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
 
         try {
             if (dailyAnswer == null) {
