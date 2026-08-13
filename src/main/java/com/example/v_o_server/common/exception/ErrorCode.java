@@ -21,6 +21,7 @@ public enum ErrorCode {
     INVALID_TYPE_VALUE(HttpStatus.BAD_REQUEST, "C005", "요청 파라미터 타입이 올바르지 않습니다."),
     MISSING_REQUEST_PARAMETER(HttpStatus.BAD_REQUEST, "C006", "필수 요청 파라미터가 누락되었습니다."),
     TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "C007", "요청이 너무 잦습니다. 잠시 후 다시 시도해주세요."),
+    MISSING_REQUEST_PART(HttpStatus.BAD_REQUEST, "C008", "필수 요청 파트가 누락되었습니다."),
 
     // 인증/인가
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "A001", "인증이 필요합니다."),
