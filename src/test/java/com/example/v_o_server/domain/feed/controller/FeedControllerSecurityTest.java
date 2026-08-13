@@ -12,6 +12,7 @@ import com.example.v_o_server.common.security.JwtAuthenticationFilter;
 import com.example.v_o_server.config.SecurityConfig;
 import com.example.v_o_server.domain.feed.service.FeedService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Clock;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +36,8 @@ class FeedControllerSecurityTest {
 
     @MockitoBean
     private FeedService feedService;
+    @MockitoBean
+    private Clock clock;
     @MockitoBean
     private JwtProvider jwtProvider;
     @MockitoBean

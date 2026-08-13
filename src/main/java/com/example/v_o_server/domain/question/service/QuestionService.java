@@ -17,6 +17,7 @@ import com.example.v_o_server.domain.question.entity.QuestionStatus;
 import com.example.v_o_server.domain.question.repository.GroupDailyQuestionRepository;
 import com.example.v_o_server.domain.question.repository.QuestionLastShownDate;
 import com.example.v_o_server.domain.question.repository.QuestionRepository;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -43,6 +44,7 @@ public class QuestionService {
     private final QuestionRepository questionRepository;
     private final GroupDailyQuestionRepository groupDailyQuestionRepository;
     private final DailyAnswerRepository dailyAnswerRepository;
+    private final Clock clock;
 
     /**
      * 그룹의 오늘의 질문을 조회한다. 아직 배정된 적이 없으면 이 시점에 새로 배정한다.
@@ -52,7 +54,7 @@ public class QuestionService {
         PrivateGroup group = groupAccessGuard.getActiveGroup(groupId);
         groupAccessGuard.assertMember(groupId, userId);
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
 
         GroupDailyQuestion dailyQuestion = groupDailyQuestionRepository
                 .findByGroupIdAndServiceDate(groupId, today)
@@ -70,7 +72,7 @@ public class QuestionService {
      */
     @Transactional
     public List<UnansweredQuestionResponse> getUnansweredQuestions(Long userId) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         List<GroupMember> memberships = groupMemberRepository.findActiveMembershipsWithGroup(userId);
 
         List<UnansweredQuestionResponse> result = new ArrayList<>();
@@ -122,7 +124,8 @@ public class QuestionService {
         Question selected = eligibleCandidates.isEmpty()
                 ? pickOldestShown(candidates, lastShownByQuestionId)
                 : pickByUsageWeightedRandom(eligibleCandidates);
-        selected.use(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now(clock);
+        selected.use(now);
 
         GroupDailyQuestion dailyQuestion = GroupDailyQuestion.builder()
                 .group(group)
@@ -130,7 +133,7 @@ public class QuestionService {
                 .serviceDate(today)
                 .questionContentSnapshot(selected.getContent())
                 .answerTimeLimitMs(selected.getAnswerTimeLimitMs())
-                .assignedAt(LocalDateTime.now())
+                .assignedAt(now)
                 .expiresAt(today.plusDays(1).atStartOfDay())
                 .status(AssignmentStatus.ACTIVE)
                 .build();

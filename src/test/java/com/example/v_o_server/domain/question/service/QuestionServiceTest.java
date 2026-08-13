@@ -32,8 +32,11 @@ import com.example.v_o_server.domain.question.entity.QuestionStatus;
 import com.example.v_o_server.domain.question.repository.GroupDailyQuestionRepository;
 import com.example.v_o_server.domain.question.repository.QuestionLastShownDate;
 import com.example.v_o_server.domain.question.repository.QuestionRepository;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +46,11 @@ import org.springframework.test.util.ReflectionTestUtils;
 class QuestionServiceTest {
 
     private static final Long USER_ID = 7L;
+    private static final Clock FIXED_KST_CLOCK = Clock.fixed(
+            Instant.parse("2026-07-24T15:30:00Z"),
+            ZoneId.of("Asia/Seoul")
+    );
+    private static final LocalDate KST_TODAY = LocalDate.of(2026, 7, 25);
 
     private GroupAccessGuard groupAccessGuard;
     private GroupMemberRepository groupMemberRepository;
@@ -60,13 +68,13 @@ class QuestionServiceTest {
         dailyAnswerRepository = mock(DailyAnswerRepository.class);
         questionService = new QuestionService(
                 groupAccessGuard, groupMemberRepository, questionRepository,
-                groupDailyQuestionRepository, dailyAnswerRepository);
+                groupDailyQuestionRepository, dailyAnswerRepository, FIXED_KST_CLOCK);
     }
 
     @Test
     void 오늘_이미_배정된_질문이_있으면_그대로_반환하고_재배정하지_않는다() {
         Long groupId = 1L;
-        LocalDate today = LocalDate.now();
+        LocalDate today = KST_TODAY;
         Question question = questionWithId(10L, "질문A", 0);
         GroupDailyQuestion existing = dailyQuestionWithId(100L, question, today);
         given(groupAccessGuard.getActiveGroup(groupId))
@@ -186,7 +194,7 @@ class QuestionServiceTest {
         given(questionRepository.findByThemeIdAndStatus(1L, QuestionStatus.ACTIVE))
                 .willReturn(List.of(recentlyShown, eligible));
         given(groupDailyQuestionRepository.findLastShownDatesByGroupId(groupId))
-                .willReturn(List.of(new QuestionLastShownDate(10L, LocalDate.now().minusDays(5))));
+                .willReturn(List.of(new QuestionLastShownDate(10L, KST_TODAY.minusDays(5))));
         given(groupDailyQuestionRepository.save(any(GroupDailyQuestion.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
 
@@ -210,8 +218,8 @@ class QuestionServiceTest {
                 .willReturn(List.of(shownRecently, shownLongerAgo));
         given(groupDailyQuestionRepository.findLastShownDatesByGroupId(groupId))
                 .willReturn(List.of(
-                        new QuestionLastShownDate(10L, LocalDate.now().minusDays(2)),
-                        new QuestionLastShownDate(11L, LocalDate.now().minusDays(10))
+                        new QuestionLastShownDate(10L, KST_TODAY.minusDays(2)),
+                        new QuestionLastShownDate(11L, KST_TODAY.minusDays(10))
                 ));
         given(groupDailyQuestionRepository.save(any(GroupDailyQuestion.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
@@ -228,8 +236,8 @@ class QuestionServiceTest {
         PrivateGroup unansweredGroup = activeGroupWithTheme(2L, theme);
         Question answeredQuestion = questionWithId(10L, "이미 답변한 질문", 1);
         Question unansweredQuestion = questionWithId(11L, "아직 답변 안 한 질문", 1);
-        GroupDailyQuestion answeredDaily = dailyQuestionWithId(100L, answeredQuestion, LocalDate.now());
-        GroupDailyQuestion unansweredDaily = dailyQuestionWithId(101L, unansweredQuestion, LocalDate.now());
+        GroupDailyQuestion answeredDaily = dailyQuestionWithId(100L, answeredQuestion, KST_TODAY);
+        GroupDailyQuestion unansweredDaily = dailyQuestionWithId(101L, unansweredQuestion, KST_TODAY);
 
         given(groupMemberRepository.findActiveMembershipsWithGroup(USER_ID))
                 .willReturn(List.of(membershipOf(answeredGroup), membershipOf(unansweredGroup)));
@@ -285,7 +293,7 @@ class QuestionServiceTest {
         GroupTheme theme = themeWithId(2L, "FRIEND");
         PrivateGroup okGroup = activeGroupWithTheme(2L, theme);
         Question question = questionWithId(10L, "정상 그룹 질문", 0);
-        GroupDailyQuestion okDaily = dailyQuestionWithId(100L, question, LocalDate.now());
+        GroupDailyQuestion okDaily = dailyQuestionWithId(100L, question, KST_TODAY);
 
         given(groupMemberRepository.findActiveMembershipsWithGroup(USER_ID))
                 .willReturn(List.of(membershipOf(brokenGroup), membershipOf(okGroup)));
