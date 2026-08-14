@@ -33,6 +33,10 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
     List<GroupMember> findByGroupIdAndStatusAndUserIdIn(Long groupId, MemberStatus status,
                                                         Collection<Long> userIds);
 
+    /** 홈 피드용 — 여러 그룹에 걸친 작성자의 memberId를 한 번에 조회한다. */
+    List<GroupMember> findByGroupIdInAndStatusAndUserIdIn(Collection<Long> groupIds, MemberStatus status,
+                                                          Collection<Long> userIds);
+
     /** 현재 사용자가 ACTIVE 멤버로 속한 그룹의 멤버십 목록 (그룹도 ACTIVE인 것만). */
     @Query("""
             select m from GroupMember m
