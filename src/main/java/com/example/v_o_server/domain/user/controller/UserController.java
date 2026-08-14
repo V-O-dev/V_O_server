@@ -1,5 +1,6 @@
 package com.example.v_o_server.domain.user.controller;
 
+import com.example.v_o_server.common.exception.ErrorCode;
 import com.example.v_o_server.common.response.ApiResponse;
 import com.example.v_o_server.domain.user.dto.request.UpdateNicknameRequest;
 import com.example.v_o_server.domain.user.dto.request.UpdateNotificationSettingsRequest;
@@ -12,8 +13,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 @Tag(name = "User", description = "사용자/프로필 관련 API")
 @RestController
@@ -78,5 +82,23 @@ public class UserController {
     public ApiResponse<ProfileImageResponse> deleteProfileImage(@AuthenticationPrincipal Long userId) {
         ProfileImageResponse response = userService.deleteProfileImage(userId);
         return ApiResponse.success(response);
+    }
+
+    /**
+     * 이미지 파트가 아예 없거나 파일이 아닌 값으로 온 경우를 이 도메인의 검증 코드로 통일한다.
+     *
+     * <p>사용자 입장에서 "파일을 안 보냄", "빈 값을 보냄", "0바이트 파일을 보냄"은 모두 같은 상황이다.
+     * 앞의 둘은 파트 자체가 성립하지 않아 전역 핸들러의 {@code C008}로, 마지막은 서비스 검증의
+     * {@code U008}로 갈렸는데, 여기서 앞의 둘을 {@code U008}로 맞춰 셋을 같은 응답으로 만든다.</p>
+     *
+     * <p>이 방식을 쓰는 이유는 {@code @RequestPart}를 {@code required = true}로 유지하기 위해서다.
+     * springdoc은 multipart 스키마의 {@code required}를 {@code @RequestPart.required()}에서만 읽으므로,
+     * 이를 {@code false}로 바꾸면 OpenAPI에서 "이미지는 필수" 표기가 사라진다.
+     * 즉 <b>문서 계약과 응답 코드 통일을 모두 지키기 위한</b> 컨트롤러 한정 처리다.</p>
+     */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingImagePart(MissingServletRequestPartException e) {
+        return ResponseEntity.status(ErrorCode.IMAGE_REQUIRED.getStatus())
+                .body(ApiResponse.error(ErrorCode.IMAGE_REQUIRED));
     }
 }
