@@ -178,6 +178,9 @@ public class AuthService {
     /**
      * 회원 탈퇴. 계정을 soft delete하고 <b>모든 기기의 인증 수단을 무효화</b>한다.
      *
+     * <p>사용자 행과 영상·댓글·아카이브 같은 연결 데이터는 과거 그룹 기록 보존을 위해 삭제하지 않는다.
+     * 사용자 상태와 탈퇴 시각만 변경하고 OAuth 연결을 해제한다.</p>
+     *
      * @param rawAccessToken 현재 요청에 쓰인 accessToken. 즉시 차단하기 위해 블랙리스트에 넣는다.
      */
     public void withdraw(Long userId, String rawAccessToken) {
