@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -85,7 +86,7 @@ class HomeFeedControllerTest {
                 true,
                 1,
                 LocalDateTime.of(2026, 8, 12, 11, 59, 50),
-                LocalDateTime.of(2026, 8, 12, 12, 0)
+                LocalDateTime.of(2026, 8, 12, 12, 0).atOffset(ZoneOffset.ofHours(9))
         );
         HomeFeedResponse response = HomeFeedResponse.of(
                 SERVICE_DATE,
@@ -117,6 +118,8 @@ class HomeFeedControllerTest {
                 .andExpect(jsonPath("$.data.items[0].video.videoId").value(105))
                 .andExpect(jsonPath("$.data.items[0].video.displayName").value("동생"))
                 .andExpect(jsonPath("$.data.items[0].video.isMe").value(false))
+                .andExpect(jsonPath("$.data.items[0].video.uploadedAt")
+                        .value("2026-08-12T12:00:00+09:00"))
                 .andExpect(jsonPath("$.data.totalElements").value(1));
 
         verify(homeFeedService).getHomeFeed(AUTH_USER_ID, SERVICE_DATE, 0, 20);

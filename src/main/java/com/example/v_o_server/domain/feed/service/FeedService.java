@@ -1,5 +1,7 @@
 package com.example.v_o_server.domain.feed.service;
 
+import static com.example.v_o_server.common.time.KoreaDateTime.toOffsetDateTime;
+
 import com.example.v_o_server.domain.answer.entity.AnswerUploadStatus;
 import com.example.v_o_server.domain.answer.entity.DailyAnswer;
 import com.example.v_o_server.domain.answer.entity.Video;
@@ -150,7 +152,7 @@ public class FeedService {
                 reactedByMe,
                 commentCount,
                 video.getCapturedAt(),
-                video.getUploadedAt()
+                toOffsetDateTime(video.getUploadedAt())
         );
     }
 }

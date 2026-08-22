@@ -1,5 +1,6 @@
 package com.example.v_o_server.domain.feed.service;
 
+import static com.example.v_o_server.common.time.KoreaDateTime.toOffsetDateTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -188,7 +189,7 @@ class FeedServiceTest {
             assertThat(item.reactionCount()).isEqualTo(4);
             assertThat(item.reactedByMe()).isTrue();
             assertThat(item.commentCount()).isEqualTo(2);
-            assertThat(item.uploadedAt()).isEqualTo(uploadedAt);
+            assertThat(item.uploadedAt()).isEqualTo(toOffsetDateTime(uploadedAt));
         });
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);

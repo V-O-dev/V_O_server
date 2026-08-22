@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -84,7 +85,7 @@ class FeedControllerTest {
                 true,
                 2,
                 LocalDateTime.of(2026, 7, 24, 11, 59, 50),
-                LocalDateTime.of(2026, 7, 24, 12, 0)
+                LocalDateTime.of(2026, 7, 24, 12, 0).atOffset(ZoneOffset.ofHours(9))
         );
         given(feedService.getFeed(AUTH_USER_ID, GROUP_ID, SERVICE_DATE, 0, 20))
                 .willReturn(new FeedResponse(
@@ -119,6 +120,8 @@ class FeedControllerTest {
                 .andExpect(jsonPath("$.data.items[0].reactionCount").value(4))
                 .andExpect(jsonPath("$.data.items[0].reactedByMe").value(true))
                 .andExpect(jsonPath("$.data.items[0].commentCount").value(2))
+                .andExpect(jsonPath("$.data.items[0].uploadedAt")
+                        .value("2026-07-24T12:00:00+09:00"))
                 .andExpect(jsonPath("$.data.hasNext").value(false));
 
         verify(feedService).getFeed(AUTH_USER_ID, GROUP_ID, SERVICE_DATE, 0, 20);

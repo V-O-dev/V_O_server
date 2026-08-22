@@ -2,6 +2,7 @@ package com.example.v_o_server.domain.feed.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Schema(description = "피드 영상 항목")
 public record FeedItemResponse(
@@ -64,7 +65,11 @@ public record FeedItemResponse(
         @Schema(description = "촬영 시각", nullable = true)
         LocalDateTime capturedAt,
 
-        @Schema(description = "업로드 시각", nullable = true)
-        LocalDateTime uploadedAt
+        @Schema(
+                description = "업로드 시각 (KST 오프셋 포함)",
+                example = "2026-08-22T12:00:00+09:00",
+                nullable = true
+        )
+        OffsetDateTime uploadedAt
 ) {
 }

@@ -1,5 +1,7 @@
 package com.example.v_o_server.domain.answer.service;
 
+import static com.example.v_o_server.common.time.KoreaDateTime.toOffsetDateTime;
+
 import com.example.v_o_server.common.exception.BusinessException;
 import com.example.v_o_server.common.exception.ErrorCode;
 import com.example.v_o_server.common.storage.FileStorageService;
@@ -169,7 +171,7 @@ public class VideoService {
                 video.getVideoUrl(),
                 video.getThumbnailUrl(),
                 video.getDurationMs(),
-                video.getUploadedAt()
+                toOffsetDateTime(video.getUploadedAt())
         );
     }
 }

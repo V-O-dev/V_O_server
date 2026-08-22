@@ -1,5 +1,6 @@
 package com.example.v_o_server.domain.answer.service;
 
+import static com.example.v_o_server.common.time.KoreaDateTime.toOffsetDateTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
@@ -121,6 +122,7 @@ class VideoServiceTest {
         assertThat(response.questionId()).isEqualTo(QUESTION_ID);
         assertThat(response.videoUrl()).isEqualTo("https://cdn.example.com/video.mp4");
         assertThat(response.durationMs()).isEqualTo(10_000);
+        assertThat(response.uploadedAt()).isEqualTo(toOffsetDateTime(KST_NOW));
 
         ArgumentCaptor<DailyAnswer> answerCaptor = ArgumentCaptor.forClass(DailyAnswer.class);
         verify(dailyAnswerRepository).save(answerCaptor.capture());

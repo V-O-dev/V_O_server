@@ -21,6 +21,8 @@ import com.example.v_o_server.domain.answer.dto.request.VideoUploadMetadataReque
 import com.example.v_o_server.domain.answer.dto.response.VideoResponse;
 import com.example.v_o_server.domain.answer.service.VideoService;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -73,7 +75,8 @@ class VideoControllerTest {
                 "video/mp4",
                 new byte[]{1, 2, 3}
         );
-        LocalDateTime uploadedAt = LocalDateTime.of(2026, 7, 24, 12, 1);
+        OffsetDateTime uploadedAt = LocalDateTime.of(2026, 7, 24, 12, 1)
+                .atOffset(ZoneOffset.ofHours(9));
         given(videoService.uploadVideo(eq(AUTH_USER_ID), any(VideoUploadMetadataRequest.class), eq(video)))
                 .willReturn(new VideoResponse(
                         100L,
@@ -98,7 +101,9 @@ class VideoControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.videoId").value(100))
-                .andExpect(jsonPath("$.data.durationMs").value(10_000));
+                .andExpect(jsonPath("$.data.durationMs").value(10_000))
+                .andExpect(jsonPath("$.data.uploadedAt")
+                        .value("2026-07-24T12:01:00+09:00"));
 
         ArgumentCaptor<VideoUploadMetadataRequest> metadataCaptor =
                 ArgumentCaptor.forClass(VideoUploadMetadataRequest.class);
@@ -188,7 +193,8 @@ class VideoControllerTest {
     @Test
     @DisplayName("영상 상세 조회는 공통 응답으로 반환한다")
     void getVideo() throws Exception {
-        LocalDateTime uploadedAt = LocalDateTime.of(2026, 7, 24, 12, 1);
+        OffsetDateTime uploadedAt = LocalDateTime.of(2026, 7, 24, 12, 1)
+                .atOffset(ZoneOffset.ofHours(9));
         given(videoService.getVideo(AUTH_USER_ID, 100L))
                 .willReturn(new VideoResponse(
                         100L,
@@ -204,7 +210,9 @@ class VideoControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.videoId").value(100))
                 .andExpect(jsonPath("$.data.groupId").value(10))
-                .andExpect(jsonPath("$.data.questionId").value(20));
+                .andExpect(jsonPath("$.data.questionId").value(20))
+                .andExpect(jsonPath("$.data.uploadedAt")
+                        .value("2026-07-24T12:01:00+09:00"));
 
         verify(videoService).getVideo(AUTH_USER_ID, 100L);
     }
