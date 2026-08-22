@@ -14,6 +14,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import java.util.List;
 
@@ -70,6 +71,20 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ErrorCode.MISSING_REQUEST_PARAMETER.getStatus())
                 .body(ApiResponse.error(ErrorCode.MISSING_REQUEST_PARAMETER,
                         "필수 파라미터 '" + e.getParameterName() + "'가 누락되었습니다."));
+    }
+
+    /**
+     * 필수 multipart 파트 누락.
+     *
+     * <p>이 핸들러가 없으면 최종 방어선인 {@link #handleException}이 잡아 500으로 응답한다.
+     * Spring 기본 동작은 400이므로, 핸들러가 없는 편이 오히려 나빴다.</p>
+     */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingPart(MissingServletRequestPartException e) {
+        log.warn("Missing request part: {}", e.getRequestPartName());
+        return ResponseEntity.status(ErrorCode.MISSING_REQUEST_PART.getStatus())
+                .body(ApiResponse.error(ErrorCode.MISSING_REQUEST_PART,
+                        "필수 요청 파트 '" + e.getRequestPartName() + "'가 누락되었습니다."));
     }
 
     /**

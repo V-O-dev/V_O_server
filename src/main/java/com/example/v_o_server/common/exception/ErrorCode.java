@@ -21,6 +21,7 @@ public enum ErrorCode {
     INVALID_TYPE_VALUE(HttpStatus.BAD_REQUEST, "C005", "요청 파라미터 타입이 올바르지 않습니다."),
     MISSING_REQUEST_PARAMETER(HttpStatus.BAD_REQUEST, "C006", "필수 요청 파라미터가 누락되었습니다."),
     TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "C007", "요청이 너무 잦습니다. 잠시 후 다시 시도해주세요."),
+    MISSING_REQUEST_PART(HttpStatus.BAD_REQUEST, "C008", "필수 요청 파트가 누락되었습니다."),
 
     // 인증/인가
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "A001", "인증이 필요합니다."),
@@ -34,6 +35,7 @@ public enum ErrorCode {
     /** 로깅/추적 태그 용도. 정책상 클라이언트로 던지지 않고 탈퇴 자체는 롤백하지 않는다. */
     OAUTH_UNLINK_FAILED(HttpStatus.BAD_GATEWAY, "A009", "OAuth provider unlink에 실패했습니다."),
     OAUTH_INVALID_STATE(HttpStatus.UNAUTHORIZED, "A010", "로그인 요청이 만료되었거나 유효하지 않습니다. 다시 시도해주세요."),
+    WITHDRAWN_USER(HttpStatus.UNAUTHORIZED, "A011", "탈퇴한 계정입니다."),
 
     // 사용자
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U001", "사용자를 찾을 수 없습니다."),

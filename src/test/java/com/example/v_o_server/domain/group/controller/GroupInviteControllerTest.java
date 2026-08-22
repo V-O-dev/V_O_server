@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.v_o_server.common.exception.BusinessException;
 import com.example.v_o_server.common.exception.ErrorCode;
+import com.example.v_o_server.common.security.AccountStatusChecker;
 import com.example.v_o_server.common.security.JwtAuthenticationFilter;
 import com.example.v_o_server.config.SecurityConfig;
 import com.example.v_o_server.domain.group.service.GroupInviteService;
@@ -35,6 +36,10 @@ class GroupInviteControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    // JwtAuthenticationFilter가 요구하는 협력자. 이 슬라이스에는 domain 구현체가 없어 목으로 채운다.
+    @MockitoBean
+    private AccountStatusChecker accountStatusChecker;
 
     @MockitoBean
     private GroupInviteService groupInviteService;

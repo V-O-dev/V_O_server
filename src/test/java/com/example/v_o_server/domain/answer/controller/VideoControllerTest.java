@@ -3,13 +3,18 @@ package com.example.v_o_server.domain.answer.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.v_o_server.common.exception.BusinessException;
+import com.example.v_o_server.common.exception.ErrorCode;
+import com.example.v_o_server.common.security.AccountStatusChecker;
 import com.example.v_o_server.common.security.JwtAuthenticationFilter;
 import com.example.v_o_server.config.SecurityConfig;
 import com.example.v_o_server.domain.answer.dto.request.VideoUploadMetadataRequest;
@@ -46,6 +51,10 @@ class VideoControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    // JwtAuthenticationFilter가 요구하는 협력자. 이 슬라이스에는 domain 구현체가 없어 목으로 채운다.
+    @MockitoBean
+    private AccountStatusChecker accountStatusChecker;
 
     @MockitoBean
     private VideoService videoService;
@@ -102,6 +111,38 @@ class VideoControllerTest {
         assertThat(metadataCaptor.getValue().cameraFacing()).isEqualTo("FRONT");
         assertThat(metadataCaptor.getValue().capturedAt())
                 .isEqualTo(LocalDateTime.of(2026, 7, 24, 12, 0));
+    }
+
+    @Test
+    @DisplayName("영상 칸이 빈 문자열이면 바인딩을 통과해 서비스 검증(V010)까지 간다")
+    void emptyVideoTextReachesServiceValidation() throws Exception {
+        willThrow(new BusinessException(ErrorCode.VIDEO_REQUIRED))
+                .given(videoService).uploadVideo(eq(AUTH_USER_ID), any(VideoUploadMetadataRequest.class), isNull());
+
+        mockMvc.perform(multipart("/api/v1/videos")
+                        .param("groupId", "10")
+                        .param("questionId", "20")
+                        .param("durationMs", "10000")
+                        .param("video", "")
+                        .with(authUser()))
+                .andExpect(status().isBadRequest())
+                // C001(String→MultipartFile 변환 실패)이 아니라 V010이어야 한다
+                .andExpect(jsonPath("$.code").value("V010"));
+    }
+
+    @Test
+    @DisplayName("영상 파트가 아예 없어도 동일하게 V010이다")
+    void missingVideoPartReachesServiceValidation() throws Exception {
+        willThrow(new BusinessException(ErrorCode.VIDEO_REQUIRED))
+                .given(videoService).uploadVideo(eq(AUTH_USER_ID), any(VideoUploadMetadataRequest.class), isNull());
+
+        mockMvc.perform(multipart("/api/v1/videos")
+                        .param("groupId", "10")
+                        .param("questionId", "20")
+                        .param("durationMs", "10000")
+                        .with(authUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("V010"));
     }
 
     @Test

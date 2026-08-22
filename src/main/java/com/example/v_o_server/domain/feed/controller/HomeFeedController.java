@@ -1,8 +1,8 @@
 package com.example.v_o_server.domain.feed.controller;
 
 import com.example.v_o_server.common.response.ApiResponse;
-import com.example.v_o_server.domain.feed.dto.FeedResponse;
-import com.example.v_o_server.domain.feed.service.FeedService;
+import com.example.v_o_server.domain.feed.dto.HomeFeedResponse;
+import com.example.v_o_server.domain.feed.service.HomeFeedService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
@@ -14,30 +14,29 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Feed", description = "그룹 영상 피드 API")
 @RestController
-@RequestMapping("/api/v1/groups/{groupId}/feed")
+@RequestMapping("/api/v1/feeds")
 @RequiredArgsConstructor
 @Validated
-public class FeedController {
+public class HomeFeedController {
 
-    private final FeedService feedService;
+    private final HomeFeedService homeFeedService;
     private final Clock clock;
 
     @Operation(
-            summary = "그룹 영상 피드 조회",
-            description = "해당 날짜의 ACTIVE 영상 피드를 최신순으로 제공합니다. "
-                    + "조회자가 답변을 업로드하지 않았다면 unlocked=false이며, 클라이언트는 items의 영상을 블러 처리해야 합니다."
+            summary = "전체 그룹 통합 홈 피드 조회",
+            description = "내가 ACTIVE로 속한 모든 그룹의 해당 날짜 ACTIVE 영상을 uploadedAt 최신순 한 타임라인으로 합쳐 제공합니다. "
+                    + "잠금은 그룹별로 판단되며(groups[]·items[]의 unlocked), 잠긴 그룹의 영상도 items에 포함되므로 "
+                    + "클라이언트가 블러 처리해야 합니다."
     )
-    @GetMapping
-    public ApiResponse<FeedResponse> getFeed(
+    @GetMapping("/home")
+    public ApiResponse<HomeFeedResponse> getHomeFeed(
             @AuthenticationPrincipal Long userId,
-            @PathVariable Long groupId,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate serviceDate,
             @RequestParam(defaultValue = "0")
@@ -47,6 +46,6 @@ public class FeedController {
             @Max(value = 50, message = "페이지 크기는 50 이하여야 합니다.") int size
     ) {
         LocalDate targetDate = serviceDate == null ? LocalDate.now(clock) : serviceDate;
-        return ApiResponse.success(feedService.getFeed(userId, groupId, targetDate, page, size));
+        return ApiResponse.success(homeFeedService.getHomeFeed(userId, targetDate, page, size));
     }
 }

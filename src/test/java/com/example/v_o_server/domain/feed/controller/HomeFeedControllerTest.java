@@ -11,8 +11,10 @@ import com.example.v_o_server.common.security.JwtAuthenticationFilter;
 import com.example.v_o_server.config.SecurityConfig;
 import com.example.v_o_server.domain.answer.entity.AnswerUploadStatus;
 import com.example.v_o_server.domain.feed.dto.FeedItemResponse;
-import com.example.v_o_server.domain.feed.dto.FeedResponse;
-import com.example.v_o_server.domain.feed.service.FeedService;
+import com.example.v_o_server.domain.feed.dto.HomeFeedGroupResponse;
+import com.example.v_o_server.domain.feed.dto.HomeFeedItemResponse;
+import com.example.v_o_server.domain.feed.dto.HomeFeedResponse;
+import com.example.v_o_server.domain.feed.service.HomeFeedService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -34,17 +36,16 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
-@WebMvcTest(controllers = FeedController.class,
+@WebMvcTest(controllers = HomeFeedController.class,
         excludeFilters = @ComponentScan.Filter(
                 type = FilterType.ASSIGNABLE_TYPE,
                 classes = {SecurityConfig.class, JwtAuthenticationFilter.class}))
 @AutoConfigureMockMvc(addFilters = false)
-@DisplayName("FeedController")
-class FeedControllerTest {
+@DisplayName("HomeFeedController")
+class HomeFeedControllerTest {
 
     private static final Long AUTH_USER_ID = 1L;
-    private static final Long GROUP_ID = 100L;
-    private static final LocalDate SERVICE_DATE = LocalDate.of(2026, 7, 24);
+    private static final LocalDate SERVICE_DATE = LocalDate.of(2026, 8, 12);
 
     @Autowired
     private MockMvc mockMvc;
@@ -54,7 +55,7 @@ class FeedControllerTest {
     private AccountStatusChecker accountStatusChecker;
 
     @MockitoBean
-    private FeedService feedService;
+    private HomeFeedService homeFeedService;
     @MockitoBean
     private Clock clock;
 
@@ -64,64 +65,61 @@ class FeedControllerTest {
     }
 
     @Test
-    @DisplayName("그룹 피드는 잠금 상태와 영상 목록을 공통 응답으로 반환한다")
-    void getFeed() throws Exception {
-        FeedItemResponse item = new FeedItemResponse(
-                10L,
-                2L,
+    @DisplayName("홈 피드는 그룹 목록과 통합 영상 목록을 함께 반환한다")
+    void getHomeFeed() throws Exception {
+        FeedItemResponse video = new FeedItemResponse(
+                105L,
+                3L,
                 21L,
                 false,
-                "동구",
-                "막내",
-                "막내",
+                "김동생",
+                "동생",
+                "동생",
                 "https://cdn.example.com/profile.jpg",
                 20L,
                 "오늘 가장 웃겼던 일은?",
                 "https://cdn.example.com/video.mp4",
-                "https://cdn.example.com/thumbnail.jpg",
+                null,
                 10_000,
-                4,
+                3,
                 true,
-                2,
-                LocalDateTime.of(2026, 7, 24, 11, 59, 50),
-                LocalDateTime.of(2026, 7, 24, 12, 0)
+                1,
+                LocalDateTime.of(2026, 8, 12, 11, 59, 50),
+                LocalDateTime.of(2026, 8, 12, 12, 0)
         );
-        given(feedService.getFeed(AUTH_USER_ID, GROUP_ID, SERVICE_DATE, 0, 20))
-                .willReturn(new FeedResponse(
-                        true,
-                        SERVICE_DATE,
-                        AnswerUploadStatus.UPLOADED,
-                        List.of(item),
-                        0,
-                        20,
-                        1,
-                        1,
-                        false
-                ));
+        HomeFeedResponse response = HomeFeedResponse.of(
+                SERVICE_DATE,
+                List.of(new HomeFeedGroupResponse(10L, "우리 가족", "https://cdn.example.com/g.jpg",
+                        true, AnswerUploadStatus.UPLOADED)),
+                new org.springframework.data.domain.PageImpl<>(
+                        List.of(new HomeFeedItemResponse(10L, "우리 가족", true, video)),
+                        org.springframework.data.domain.PageRequest.of(0, 20),
+                        1
+                )
+        );
+        given(homeFeedService.getHomeFeed(AUTH_USER_ID, SERVICE_DATE, 0, 20)).willReturn(response);
 
-        mockMvc.perform(get("/api/v1/groups/{groupId}/feed", GROUP_ID)
-                        .param("serviceDate", "2026-07-24")
+        mockMvc.perform(get("/api/v1/feeds/home")
+                        .param("serviceDate", "2026-08-12")
                         .with(authUser()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.unlocked").value(true))
-                .andExpect(jsonPath("$.data.viewerAnswerStatus").value("UPLOADED"))
-                .andExpect(jsonPath("$.data.items[0].videoId").value(10))
-                .andExpect(jsonPath("$.data.items[0].nickname").value("동구"))
-                .andExpect(jsonPath("$.data.items[0].alias").value("막내"))
-                .andExpect(jsonPath("$.data.items[0].displayName").value("막내"))
-                .andExpect(jsonPath("$.data.items[0].memberId").value(21))
-                // 프론트가 feed.isMe로 읽으므로 직렬화된 키 이름까지 고정한다.
-                // Jackson이 boolean 레코드 컴포넌트를 "me"로 깎으면 조용히 깨진다.
-                .andExpect(jsonPath("$.data.items[0].isMe").value(false))
-                .andExpect(jsonPath("$.data.items[0].questionContent")
-                        .value("오늘 가장 웃겼던 일은?"))
-                .andExpect(jsonPath("$.data.items[0].reactionCount").value(4))
-                .andExpect(jsonPath("$.data.items[0].reactedByMe").value(true))
-                .andExpect(jsonPath("$.data.items[0].commentCount").value(2))
-                .andExpect(jsonPath("$.data.hasNext").value(false));
+                .andExpect(jsonPath("$.data.serviceDate").value("2026-08-12"))
+                .andExpect(jsonPath("$.data.groups[0].groupId").value(10))
+                // GET /api/v1/groups(GroupSummaryResponse)와 같은 필드명(name/imageUrl)으로 내려가야
+                // 클라이언트가 그룹 요약 정보를 한 형태로 다룰 수 있다 — groupName/groupImageUrl로 새면 조용히 깨진다.
+                .andExpect(jsonPath("$.data.groups[0].name").value("우리 가족"))
+                .andExpect(jsonPath("$.data.groups[0].imageUrl").value("https://cdn.example.com/g.jpg"))
+                .andExpect(jsonPath("$.data.groups[0].unlocked").value(true))
+                .andExpect(jsonPath("$.data.items[0].groupId").value(10))
+                .andExpect(jsonPath("$.data.items[0].groupName").value("우리 가족"))
+                .andExpect(jsonPath("$.data.items[0].unlocked").value(true))
+                .andExpect(jsonPath("$.data.items[0].video.videoId").value(105))
+                .andExpect(jsonPath("$.data.items[0].video.displayName").value("동생"))
+                .andExpect(jsonPath("$.data.items[0].video.isMe").value(false))
+                .andExpect(jsonPath("$.data.totalElements").value(1));
 
-        verify(feedService).getFeed(AUTH_USER_ID, GROUP_ID, SERVICE_DATE, 0, 20);
+        verify(homeFeedService).getHomeFeed(AUTH_USER_ID, SERVICE_DATE, 0, 20);
     }
 
     @Test
@@ -130,31 +128,20 @@ class FeedControllerTest {
         LocalDate koreaDate = LocalDate.of(2026, 7, 25);
         given(clock.instant()).willReturn(Instant.parse("2026-07-24T15:30:00Z"));
         given(clock.getZone()).willReturn(ZoneId.of("Asia/Seoul"));
-        given(feedService.getFeed(AUTH_USER_ID, GROUP_ID, koreaDate, 0, 20))
-                .willReturn(new FeedResponse(
-                        false,
-                        koreaDate,
-                        AnswerUploadStatus.NOT_UPLOADED,
-                        List.of(),
-                        0,
-                        20,
-                        0,
-                        0,
-                        false
-                ));
+        given(homeFeedService.getHomeFeed(AUTH_USER_ID, koreaDate, 0, 20))
+                .willReturn(HomeFeedResponse.empty(koreaDate, 0, 20));
 
-        mockMvc.perform(get("/api/v1/groups/{groupId}/feed", GROUP_ID)
-                        .with(authUser()))
+        mockMvc.perform(get("/api/v1/feeds/home").with(authUser()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.serviceDate").value("2026-07-25"));
 
-        verify(feedService).getFeed(AUTH_USER_ID, GROUP_ID, koreaDate, 0, 20);
+        verify(homeFeedService).getHomeFeed(AUTH_USER_ID, koreaDate, 0, 20);
     }
 
     @Test
     @DisplayName("잘못된 날짜 형식은 C005 타입 오류를 반환한다")
     void rejectsMalformedServiceDate() throws Exception {
-        mockMvc.perform(get("/api/v1/groups/{groupId}/feed", GROUP_ID)
+        mockMvc.perform(get("/api/v1/feeds/home")
                         .param("serviceDate", "not-a-date")
                         .with(authUser()))
                 .andExpect(status().isBadRequest())
@@ -164,7 +151,7 @@ class FeedControllerTest {
     @Test
     @DisplayName("음수 페이지는 C001 검증 오류를 반환한다")
     void rejectsNegativePage() throws Exception {
-        mockMvc.perform(get("/api/v1/groups/{groupId}/feed", GROUP_ID)
+        mockMvc.perform(get("/api/v1/feeds/home")
                         .param("page", "-1")
                         .with(authUser()))
                 .andExpect(status().isBadRequest())
@@ -174,7 +161,7 @@ class FeedControllerTest {
     @Test
     @DisplayName("페이지 크기가 50을 넘으면 C001 검증 오류를 반환한다")
     void rejectsOversizedPage() throws Exception {
-        mockMvc.perform(get("/api/v1/groups/{groupId}/feed", GROUP_ID)
+        mockMvc.perform(get("/api/v1/feeds/home")
                         .param("size", "51")
                         .with(authUser()))
                 .andExpect(status().isBadRequest())

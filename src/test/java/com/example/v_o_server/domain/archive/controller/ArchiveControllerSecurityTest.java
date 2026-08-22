@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.v_o_server.common.jwt.JwtProvider;
 import com.example.v_o_server.common.jwt.TokenBlacklistService;
+import com.example.v_o_server.common.security.AccountStatusChecker;
 import com.example.v_o_server.common.security.JwtAccessDeniedHandler;
 import com.example.v_o_server.common.security.JwtAuthenticationEntryPoint;
 import com.example.v_o_server.common.security.JwtAuthenticationFilter;
@@ -31,6 +32,10 @@ class ArchiveControllerSecurityTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    // JwtAuthenticationFilter가 요구하는 협력자. 이 슬라이스에는 domain 구현체가 없어 목으로 채운다.
+    @MockitoBean
+    private AccountStatusChecker accountStatusChecker;
 
     @MockitoBean
     private ArchiveService archiveService;

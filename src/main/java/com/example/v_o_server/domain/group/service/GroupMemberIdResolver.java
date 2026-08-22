@@ -37,4 +37,24 @@ public class GroupMemberIdResolver {
                 .findByGroupIdAndStatusAndUserIdIn(groupId, MemberStatus.ACTIVE, userIds).stream()
                 .collect(Collectors.toMap(member -> member.getUser().getId(), GroupMember::getId));
     }
+
+    /**
+     * 홈 피드처럼 여러 그룹을 넘나드는 화면용 — {@code 그룹ID -> (대상 userId -> group_members.id)}로 반환한다.
+     *
+     * <p>{@code group_members}에 {@code (group_id, user_id)} 유니크 제약이 없어 ACTIVE 행이 중복될 수 있으므로,
+     * 그룹 내에서 같은 유저에 대한 값이 여러 개면 {@code id}가 작은(가장 오래된) 멤버십을 채택한다 —
+     * 조회 순서에 따라 결과가 흔들리지 않도록 하는 전순서 규칙이다.</p>
+     */
+    public Map<Long, Map<Long, Long>> findMemberIdsByGroup(Collection<Long> groupIds, Collection<Long> userIds) {
+        if (groupIds == null || groupIds.isEmpty() || userIds == null || userIds.isEmpty()) {
+            return Map.of();
+        }
+        return groupMemberRepository
+                .findByGroupIdInAndStatusAndUserIdIn(groupIds, MemberStatus.ACTIVE, userIds).stream()
+                .collect(Collectors.groupingBy(
+                        member -> member.getGroup().getId(),
+                        Collectors.toMap(member -> member.getUser().getId(), GroupMember::getId,
+                                (a, b) -> a <= b ? a : b)
+                ));
+    }
 }

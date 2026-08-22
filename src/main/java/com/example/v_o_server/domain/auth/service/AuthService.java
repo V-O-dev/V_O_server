@@ -108,6 +108,11 @@ public class AuthService {
                 account.recordLogin(now);
             }
             user = account.getUser();
+            // 탈퇴했던 계정으로 다시 로그인한 경우. 되살리지 않으면 계정이 WITHDRAWN으로 남아
+            // 로그인은 되는데 모든 API가 401로 막히는 상태가 된다.
+            if (user.isWithdrawn()) {
+                user.reactivate();
+            }
             user.updateLastLoginAt(now);
             isNewUser = false;
         } else {
@@ -163,14 +168,7 @@ public class AuthService {
     }
 
     public void logout(String rawAccessToken, LogoutRequest request) {
-        try {
-            Claims claims = jwtProvider.parse(rawAccessToken);
-            String jti = jwtProvider.getJti(claims);
-            long remainingSeconds = jwtProvider.getRemainingSeconds(claims);
-            tokenBlacklistService.blacklist(jti, remainingSeconds);
-        } catch (JwtException e) {
-            log.debug("logout: 이미 만료/무효한 accessToken (멱등 처리): {}", e.getMessage());
-        }
+        blacklistAccessToken(rawAccessToken);
 
         authRefreshTokenRepository.findByRefreshTokenHash(hash(request.refreshToken()))
                 .filter(token -> token.getRevokedAt() == null)
@@ -178,12 +176,14 @@ public class AuthService {
     }
 
     /**
-     * 회원을 soft delete 처리한다.
+     * 회원 탈퇴. 계정을 soft delete하고 <b>모든 기기의 인증 수단을 무효화</b>한다.
      *
      * <p>사용자 행과 영상·댓글·아카이브 같은 연결 데이터는 과거 그룹 기록 보존을 위해 삭제하지 않는다.
      * 사용자 상태와 탈퇴 시각만 변경하고 OAuth 연결을 해제한다.</p>
+     *
+     * @param rawAccessToken 현재 요청에 쓰인 accessToken. 즉시 차단하기 위해 블랙리스트에 넣는다.
      */
-    public void withdraw(Long userId) {
+    public void withdraw(Long userId, String rawAccessToken) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ENTITY_NOT_FOUND));
 
@@ -193,6 +193,14 @@ public class AuthService {
 
         LocalDateTime now = LocalDateTime.now();
         user.withdraw(now);
+
+        // 현재 기기의 accessToken은 남은 유효시간 동안 통과되므로 즉시 폐기한다(logout과 동일).
+        blacklistAccessToken(rawAccessToken);
+
+        // refreshToken을 남겨두면 탈퇴 후에도 /auth/refresh로 새 accessToken을 계속 받을 수 있다.
+        // 특정 기기가 아니라 이 사용자의 모든 활성 토큰을 끊는다.
+        authRefreshTokenRepository.findAllByUserAndRevokedAtIsNull(user)
+                .forEach(token -> token.revoke(now, "WITHDRAW"));
 
         List<AuthOauthAccount> accounts = authOauthAccountRepository.findAllByUser(user);
         for (AuthOauthAccount account : accounts) {
@@ -210,6 +218,22 @@ public class AuthService {
                         ErrorCode.OAUTH_UNLINK_FAILED.getCode(), account.getProvider(),
                         account.getProviderUserId(), e);
             }
+        }
+    }
+
+    /**
+     * accessToken을 남은 유효시간만큼 블랙리스트에 등록한다.
+     * 이미 만료·무효한 토큰이면 조용히 넘어간다(로그아웃/탈퇴 모두 멱등해야 하므로).
+     */
+    private void blacklistAccessToken(String rawAccessToken) {
+        if (rawAccessToken == null || rawAccessToken.isBlank()) {
+            return;
+        }
+        try {
+            Claims claims = jwtProvider.parse(rawAccessToken);
+            tokenBlacklistService.blacklist(jwtProvider.getJti(claims), jwtProvider.getRemainingSeconds(claims));
+        } catch (JwtException e) {
+            log.debug("이미 만료/무효한 accessToken (멱등 처리): {}", e.getMessage());
         }
     }
 

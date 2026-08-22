@@ -10,7 +10,7 @@ import com.example.v_o_server.common.security.JwtAccessDeniedHandler;
 import com.example.v_o_server.common.security.JwtAuthenticationEntryPoint;
 import com.example.v_o_server.common.security.JwtAuthenticationFilter;
 import com.example.v_o_server.config.SecurityConfig;
-import com.example.v_o_server.domain.feed.service.FeedService;
+import com.example.v_o_server.domain.feed.service.HomeFeedService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import org.junit.jupiter.api.DisplayName;
@@ -21,11 +21,11 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(controllers = FeedController.class)
+@WebMvcTest(controllers = HomeFeedController.class)
 @Import({SecurityConfig.class, JwtAuthenticationFilter.class,
         JwtAuthenticationEntryPoint.class, JwtAccessDeniedHandler.class})
-@DisplayName("FeedController 보안")
-class FeedControllerSecurityTest {
+@DisplayName("HomeFeedController 보안")
+class HomeFeedControllerSecurityTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -35,7 +35,7 @@ class FeedControllerSecurityTest {
     private AccountStatusChecker accountStatusChecker;
 
     @MockitoBean
-    private FeedService feedService;
+    private HomeFeedService homeFeedService;
     @MockitoBean
     private Clock clock;
     @MockitoBean
@@ -46,9 +46,9 @@ class FeedControllerSecurityTest {
     private ObjectMapper objectMapper;
 
     @Test
-    @DisplayName("토큰 없이 그룹 피드를 호출하면 401")
-    void feedRequiresAuthentication() throws Exception {
-        mockMvc.perform(get("/api/v1/groups/100/feed"))
+    @DisplayName("토큰 없이 홈 피드를 호출하면 401")
+    void homeFeedRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/v1/feeds/home"))
                 .andExpect(status().isUnauthorized());
     }
 }

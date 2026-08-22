@@ -27,6 +27,23 @@ public interface GroupMemberAliasRepository extends JpaRepository<GroupMemberAli
                                        @Param("targetUserIds") Collection<Long> targetUserIds);
 
     /**
+     * 홈 피드처럼 여러 그룹을 넘나드는 화면용 — viewer가 지정한 호칭을 그룹 제한 없이 한 번에 조회한다.
+     *
+     * <p>{@link #findAliases}와 달리 특정 그룹으로 좁히지 않으므로, 호출부가 그룹별로 결과를 다시 나눠야 한다
+     * ({@code GroupMemberAliasReader.findAliasesByGroup} 참고). 대상 집합은 여전히 좁혀서 받는다 —
+     * 이유는 {@link #findAliases}의 문서를 그대로 따른다.</p>
+     */
+    @Query("""
+            select a from GroupMemberAlias a
+            where a.group.id in :groupIds
+              and a.viewer.id = :viewerUserId
+              and a.target.id in :targetUserIds
+            """)
+    List<GroupMemberAlias> findAliasesInGroups(@Param("groupIds") Collection<Long> groupIds,
+                                               @Param("viewerUserId") Long viewerUserId,
+                                               @Param("targetUserIds") Collection<Long> targetUserIds);
+
+    /**
      * 호칭 설정·변경을 한 문장으로 처리한다.
      *
      * <p>"조회 후 없으면 insert" 방식은 쓰지 않는다. PostgreSQL은 유니크 제약 위반이 flush되는 순간

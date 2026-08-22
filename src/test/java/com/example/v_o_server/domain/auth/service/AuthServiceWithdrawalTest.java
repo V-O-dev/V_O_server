@@ -73,7 +73,7 @@ class AuthServiceWithdrawalTest {
         given(privateGroupRepository.existsByOwnerAndStatus(user, GroupStatus.ACTIVE)).willReturn(false);
         given(authOauthAccountRepository.findAllByUser(user)).willReturn(List.of(account));
 
-        authService.withdraw(USER_ID);
+        authService.withdraw(USER_ID, null);
 
         assertThat(user.getStatus()).isEqualTo(UserStatus.WITHDRAWN);
         assertThat(user.getWithdrawnAt()).isNotNull();
@@ -96,7 +96,7 @@ class AuthServiceWithdrawalTest {
         given(privateGroupRepository.existsByOwnerAndStatus(user, GroupStatus.ACTIVE)).willReturn(true);
 
         BusinessException exception = catchThrowableOfType(
-                () -> authService.withdraw(USER_ID),
+                () -> authService.withdraw(USER_ID, null),
                 BusinessException.class
         );
 

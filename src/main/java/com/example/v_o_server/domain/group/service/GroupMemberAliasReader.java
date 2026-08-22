@@ -34,6 +34,27 @@ public class GroupMemberAliasReader {
     }
 
     /**
+     * 홈 피드처럼 여러 그룹을 넘나드는 화면용 — {@code 그룹ID -> (대상 userId -> 호칭)}으로 반환한다.
+     *
+     * <p>같은 사람이 그룹 A·B에 모두 있고 A에서만 호칭을 지정했다면, 반환 맵에서도 A 키에만 값이 실린다.
+     * 호출부가 항목별로 "그 아이템이 속한 그룹의 맵"에서만 꺼내 써야 그룹 스코프가 깨지지 않는다.</p>
+     *
+     * @param targetUserIds 조회 대상. 비어 있으면 쿼리를 아예 실행하지 않는다.
+     */
+    public Map<Long, Map<Long, String>> findAliasesByGroup(
+            Collection<Long> groupIds, Long viewerUserId, Collection<Long> targetUserIds) {
+        if (groupIds == null || groupIds.isEmpty() || viewerUserId == null
+                || targetUserIds == null || targetUserIds.isEmpty()) {
+            return Map.of();
+        }
+        return groupMemberAliasRepository.findAliasesInGroups(groupIds, viewerUserId, targetUserIds).stream()
+                .collect(Collectors.groupingBy(
+                        alias -> alias.getGroup().getId(),
+                        Collectors.toMap(alias -> alias.getTarget().getId(), GroupMemberAlias::getAlias)
+                ));
+    }
+
+    /**
      * 화면에 그대로 찍을 표시 이름을 계산한다.
      *
      * <p>호칭이 있으면 호칭, 없으면 전역 닉네임. 온보딩 전이라 프로필이 없으면 {@code null}이며,

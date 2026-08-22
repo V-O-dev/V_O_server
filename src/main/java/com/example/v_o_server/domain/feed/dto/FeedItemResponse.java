@@ -16,10 +16,21 @@ public record FeedItemResponse(
                 example = "10", nullable = true)
         Long memberId,
 
+        @Schema(description = "내가 올린 영상인지 여부. true면 호칭 편집 화면으로 진입시키지 않는다 — "
+                + "자기 자신에게는 호칭을 지정할 수 없다. "
+                + "memberId가 null인 것으로는 판단할 수 없다. 그룹을 나간 작성자도 null이기 때문이다.",
+                example = "false")
+        boolean isMe,
+
         @Schema(description = "작성자가 직접 설정한 전역 닉네임", nullable = true)
         String nickname,
 
-        @Schema(description = "화면에 표시할 이름. 내가 이 그룹에서 작성자에게 지정한 호칭이 있으면 그 호칭, 없으면 닉네임",
+        @Schema(description = "내가 이 그룹에서 작성자에게 지정한 호칭. 지정하지 않았으면 null. "
+                + "이름 편집 화면의 입력 기본값으로 쓴다.",
+                example = "엄마", nullable = true)
+        String alias,
+
+        @Schema(description = "화면에 표시할 이름. 호칭이 있으면 호칭, 없으면 닉네임",
                 example = "엄마", nullable = true)
         String displayName,
 

@@ -2,6 +2,7 @@ package com.example.v_o_server.domain.group.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
@@ -17,6 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.v_o_server.common.exception.BusinessException;
 import com.example.v_o_server.common.exception.ErrorCode;
+import com.example.v_o_server.common.security.AccountStatusChecker;
 import com.example.v_o_server.common.security.JwtAuthenticationFilter;
 import com.example.v_o_server.config.SecurityConfig;
 import com.example.v_o_server.domain.group.dto.GroupDetailResponse;
@@ -37,6 +39,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -90,6 +93,10 @@ class GroupControllerTest {
                 }
                 """.formatted(groupName);
     }
+
+    // JwtAuthenticationFilter가 요구하는 협력자. 이 슬라이스에는 domain 구현체가 없어 목으로 채운다.
+    @MockitoBean
+    private AccountStatusChecker accountStatusChecker;
 
     @MockitoBean
     private GroupService groupService;
@@ -209,6 +216,80 @@ class GroupControllerTest {
                 .andExpect(status().isOk());
 
         verify(groupService).createGroup(eq(AUTH_USER_ID), any());
+    }
+
+    @Test
+    @DisplayName("생성 시 이미지 칸이 빈 문자열이면 이미지 없이 생성된다")
+    void createGroupWithEmptyImageText() throws Exception {
+        mockMvc.perform(multipart("/api/v1/groups")
+                        .param("groupName", "우리 가족")
+                        .param("themeCode", "FAMILY")
+                        .param("notificationStartTime", "20:00")
+                        .param("notificationEndTime", "21:00")
+                        .param("image", "")
+                        .with(authUser()))
+                .andExpect(status().isOk());
+
+        verify(groupService).createGroup(eq(AUTH_USER_ID), any(), isNull());
+    }
+
+    /* -------------------- 그룹 수정 -------------------- */
+
+    @Test
+    @DisplayName("수정 시 그룹명을 비우면 이름은 그대로 두고 이미지만 바뀐다")
+    void updateGroupWithEmptyGroupName() throws Exception {
+        MockMultipartFile image =
+                new MockMultipartFile("image", "a.png", MediaType.IMAGE_PNG_VALUE, new byte[]{1, 2, 3});
+
+        mockMvc.perform(multipart(HttpMethod.PATCH, "/api/v1/groups/1")
+                        .file(image)
+                        .param("groupName", "")
+                        .param("themeCode", "")
+                        .with(authUser()))
+                .andExpect(status().isOk());
+
+        verify(groupService).updateGroup(eq(AUTH_USER_ID), eq(1L), any(), any(MultipartFile.class));
+    }
+
+    @Test
+    @DisplayName("수정 시 이미지 칸이 빈 문자열이면 이름만 바뀐다")
+    void updateGroupWithEmptyImageText() throws Exception {
+        mockMvc.perform(multipart(HttpMethod.PATCH, "/api/v1/groups/1")
+                        .param("groupName", "새 이름")
+                        .param("image", "")
+                        .with(authUser()))
+                .andExpect(status().isOk());
+
+        verify(groupService).updateGroup(eq(AUTH_USER_ID), eq(1L), any(), isNull());
+    }
+
+    @Test
+    @DisplayName("수정 시 세 필드가 모두 비면 서비스가 C001로 거부한다")
+    void updateGroupWithAllFieldsEmpty() throws Exception {
+        willThrow(new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                "수정할 그룹명, 테마 또는 이미지가 필요합니다."))
+                .given(groupService).updateGroup(eq(AUTH_USER_ID), eq(1L), any(), isNull());
+
+        mockMvc.perform(multipart(HttpMethod.PATCH, "/api/v1/groups/1")
+                        .param("groupName", "")
+                        .param("themeCode", "")
+                        .param("image", "")
+                        .with(authUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("C001"));
+    }
+
+    @Test
+    @DisplayName("생성 시 그룹명이 비면 여전히 C001 — 생성은 그룹명이 필수다")
+    void createGroupStillRequiresGroupName() throws Exception {
+        mockMvc.perform(multipart("/api/v1/groups")
+                        .param("groupName", "")
+                        .param("themeCode", "FAMILY")
+                        .param("notificationStartTime", "20:00")
+                        .param("notificationEndTime", "21:00")
+                        .with(authUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("C001"));
     }
 
     @Test

@@ -32,8 +32,11 @@ import com.example.v_o_server.domain.question.repository.GroupDailyQuestionRepos
 import com.example.v_o_server.domain.user.entity.User;
 import com.example.v_o_server.domain.user.entity.UserStatus;
 import com.example.v_o_server.domain.user.repository.UserRepository;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -48,6 +51,14 @@ class VideoServiceTest {
     private static final Long USER_ID = 1L;
     private static final Long GROUP_ID = 10L;
     private static final Long QUESTION_ID = 20L;
+    private static final ZoneId KOREA_ZONE_ID = ZoneId.of("Asia/Seoul");
+    // UTC 2026-07-24 15:30은 KST 2026-07-25 00:30이다. 두 날짜가 갈리는 경계를 고정한다.
+    private static final Clock FIXED_KST_CLOCK = Clock.fixed(
+            Instant.parse("2026-07-24T15:30:00Z"),
+            KOREA_ZONE_ID
+    );
+    private static final LocalDate KST_TODAY = LocalDate.of(2026, 7, 25);
+    private static final LocalDateTime KST_NOW = LocalDateTime.of(2026, 7, 25, 0, 30);
 
     private GroupAccessGuard groupAccessGuard;
     private GroupDailyQuestionRepository groupDailyQuestionRepository;
@@ -74,7 +85,8 @@ class VideoServiceTest {
                 videoRepository,
                 userRepository,
                 fileStorageService,
-                archiveEntryWriter
+                archiveEntryWriter,
+                FIXED_KST_CLOCK
         );
     }
 
@@ -121,12 +133,14 @@ class VideoServiceTest {
         assertThat(videoCaptor.getValue().getHeight()).isEqualTo(1920);
         assertThat(videoCaptor.getValue().getCameraFacing()).isEqualTo("FRONT");
         assertThat(videoCaptor.getValue().getCapturedAt()).isEqualTo(metadata.capturedAt());
+        assertThat(videoCaptor.getValue().getUploadedAt()).isEqualTo(KST_NOW);
         assertThat(videoCaptor.getValue().getMimeType()).isEqualTo("video/mp4");
         assertThat(context.groupDailyQuestion().getQuestion()).isSameAs(context.question());
+        assertThat(answerCaptor.getValue().getServiceDate()).isEqualTo(KST_TODAY);
 
-        // 저장된 그 영상으로, 오늘 배정 질문·오늘 날짜로 아카이브 기록이 생성돼야 한다.
+        // 서버 기본 타임존과 무관하게 KST 업로드 날짜로 아카이브 기록이 생성돼야 한다.
         verify(archiveEntryWriter)
-                .record(eq(videoCaptor.getValue()), eq(context.groupDailyQuestion()), eq(LocalDate.now()));
+                .record(eq(videoCaptor.getValue()), eq(context.groupDailyQuestion()), eq(KST_TODAY));
     }
 
     @Test
@@ -176,7 +190,7 @@ class VideoServiceTest {
     void rejectsWhenNoDailyQuestionAssigned() {
         UploadContext context = uploadContext();
         given(groupAccessGuard.getActiveGroup(GROUP_ID)).willReturn(context.group());
-        given(groupDailyQuestionRepository.findByGroupIdAndServiceDate(GROUP_ID, LocalDate.now()))
+        given(groupDailyQuestionRepository.findByGroupIdAndServiceDate(GROUP_ID, KST_TODAY))
                 .willReturn(Optional.empty());
 
         BusinessException exception = catchThrowableOfType(
@@ -222,11 +236,11 @@ class VideoServiceTest {
                 .group(context.group())
                 .user(context.user())
                 .question(context.question())
-                .serviceDate(LocalDate.now())
+                .serviceDate(KST_TODAY)
                 .status(AnswerUploadStatus.UPLOADED)
                 .build();
         given(dailyAnswerRepository.findByGroupIdAndUserIdAndServiceDate(
-                GROUP_ID, USER_ID, LocalDate.now())).willReturn(Optional.of(uploadedAnswer));
+                GROUP_ID, USER_ID, KST_TODAY)).willReturn(Optional.of(uploadedAnswer));
 
         BusinessException exception = catchThrowableOfType(
                 () -> videoService.uploadVideo(
@@ -306,10 +320,10 @@ class VideoServiceTest {
     private UploadContext givenUploadContext() {
         UploadContext context = uploadContext();
         given(groupAccessGuard.getActiveGroup(GROUP_ID)).willReturn(context.group());
-        given(groupDailyQuestionRepository.findByGroupIdAndServiceDate(GROUP_ID, LocalDate.now()))
+        given(groupDailyQuestionRepository.findByGroupIdAndServiceDate(GROUP_ID, KST_TODAY))
                 .willReturn(Optional.of(context.groupDailyQuestion()));
         given(dailyAnswerRepository.findByGroupIdAndUserIdAndServiceDate(
-                GROUP_ID, USER_ID, LocalDate.now())).willReturn(Optional.empty());
+                GROUP_ID, USER_ID, KST_TODAY)).willReturn(Optional.empty());
         given(userRepository.getReferenceById(USER_ID)).willReturn(context.user());
         return context;
     }
@@ -340,7 +354,7 @@ class VideoServiceTest {
         GroupDailyQuestion groupDailyQuestion = GroupDailyQuestion.builder()
                 .group(group)
                 .question(question)
-                .serviceDate(LocalDate.now())
+                .serviceDate(KST_TODAY)
                 .questionContentSnapshot(question.getContent())
                 .answerTimeLimitMs(10_000)
                 .status(AssignmentStatus.ACTIVE)

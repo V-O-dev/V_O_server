@@ -67,7 +67,7 @@ public class VideoCommentService {
 
         List<CommentResponse> responses = comments.stream()
                 .map(comment -> CommentResponse.of(
-                        comment, toWriter(comment, userId, profiles, aliases, memberIds), userId))
+                        comment, groupId, toWriter(comment, userId, profiles, aliases, memberIds), userId))
                 .toList();
 
         return new CommentListResponse(responses, hasNext);
@@ -96,7 +96,7 @@ public class VideoCommentService {
                         userId, profile.getNickname(), profile.getProfileImageUrl()))
                 .orElse(CommentResponse.Writer.withoutAlias(userId, null, null));
 
-        return CommentResponse.of(comment, writer, userId);
+        return CommentResponse.of(comment, video.getGroup().getId(), writer, userId);
     }
 
     @Transactional
@@ -179,6 +179,7 @@ public class VideoCommentService {
                 writerId,
                 memberId,
                 nickname,
+                alias,
                 GroupMemberAliasReader.resolveDisplayName(alias, nickname),
                 profileImageUrl);
     }
